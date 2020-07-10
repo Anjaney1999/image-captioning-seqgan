@@ -1,15 +1,13 @@
 import argparse
 import json
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torchvision import transforms
-from torch.utils.data.dataloader import DataLoader
-from torch.nn.utils.rnn import pack_padded_sequence
-import os.path as path
 import logging
+import os.path as path
 import time
+
+import torch.optim as optim
 from nltk.translate.bleu_score import corpus_bleu
+from torch.utils.data.dataloader import DataLoader
+from torchvision import transforms
 
 from datasets import ImageCaptionDataset
 from models import *
@@ -33,7 +31,7 @@ def main(args):
 
     vocab_size = len(word_index)
 
-    checkpoint_path = args.storage + '/ckpts/' + args.dataset + '/' + args.checkpoint_filename
+    checkpoint_path = args.storage + '/ckpts/' + args.dataset + '/gen/' + args.checkpoint_filename
 
     generator = Generator(attention_dim=args.attention_dim,
                           gru_units=args.gru_units,
@@ -89,19 +87,19 @@ def main(args):
             batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     for e in range(args.epochs):
-        gen_mle_train(epoch=e, encoder=encoder, generator=generator,
-                      optimizer=optimizer, criterion=criterion,
-                      train_loader=train_loader, args=args)
+        # gen_mle_train(epoch=e, encoder=encoder, generator=generator,
+        #               optimizer=optimizer, criterion=criterion,
+        #               train_loader=train_loader, args=args)
 
         validate(epoch=e, encoder=encoder, generator=generator,
                  criterion=criterion, val_loader=val_loader,
                  word_index=word_index, args=args)
 
-        torch.save({
-            'gen_state_dict': generator.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'scheduler_state_dict': scheduler.state_dict()
-        }, args.storage + '/ckpts/' + args.dataset + '/gen/{}_{}_{}.pth'.format('mle_gen', args.cnn_architecture, e))
+        # torch.save({
+        #     'gen_state_dict': generator.state_dict(),
+        #     'optimizer_state_dict': optimizer.state_dict(),
+        #     'scheduler_state_dict': scheduler.state_dict()
+        # }, args.storage + '/ckpts/' + args.dataset + '/gen/{}_{}_{}.pth'.format('mle_gen', args.cnn_architecture, e))
 
         scheduler.step()
 
@@ -186,6 +184,7 @@ def validate(epoch,
 
     references = []
     hypotheses = []
+    hypotheses_tf = []
 
     with torch.no_grad():
 
@@ -197,11 +196,8 @@ def validate(epoch,
 
             if not args.use_image_features:
                 imgs = encoder(imgs)
-
             preds, caps, output_lens, alphas, indices = generator(imgs, caps, cap_lens)
-
             preds_clone = preds.clone()
-
             preds = pack_padded_sequence(preds, output_lens, batch_first=True)[0]
             targets = pack_padded_sequence(caps[:, 1:], output_lens, batch_first=True)[0]
 
@@ -209,54 +205,62 @@ def validate(epoch,
 
             top1_acc = categorical_accuracy(preds, targets, 1)
             top1.update(top1_acc, sum(output_lens))
-
             top5_acc = categorical_accuracy(preds, targets, 5)
             top5.update(top5_acc, sum(output_lens))
-
             losses.update(loss.item(), sum(output_lens))
 
             matching_caps = matching_caps[indices]
-
             for cap_set in matching_caps.tolist():
-                caps = []
+                refs = []
                 for caption in cap_set:
                     cap = [word_id for word_id in caption
                            if word_id != word_index['<start>'] and word_id != word_index['<pad>']]
-                    caps.append(cap)
-                references.append(caps)
+                    refs.append(cap)
+                references.append(refs)
+
+            fake_caps, _ = generator.sample(cap_len=max(max(cap_lens), args.max_len), img_feats=imgs[indices],
+                                            input_word=caps[:, 0], sampling_method='max')
+            word_idxs, _ = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
+            for idxs in word_idxs.tolist():
+                hypotheses.append([idx for idx in idxs if idx != word_index['<start>'] and idx != word_index['<pad>']])
 
             word_idxs = torch.max(preds_clone, dim=2)[1]
             word_idxs, _ = pad_generated_captions(word_idxs.cpu().numpy(), word_index)
             for idxs in word_idxs.tolist():
-                hypotheses.append([idx for idx in idxs
-                                   if idx != word_index['<start>'] and idx != word_index['<pad>']])
+                hypotheses_tf.append(
+                    [idx for idx in idxs if idx != word_index['<start>'] and idx != word_index['<pad>']])
 
         bleu_1 = corpus_bleu(references, hypotheses, weights=(1, 0, 0, 0))
         bleu_2 = corpus_bleu(references, hypotheses, weights=(0.5, 0.5, 0, 0))
         bleu_3 = corpus_bleu(references, hypotheses, weights=(0.33, 0.33, 0.33, 0))
         bleu_4 = corpus_bleu(references, hypotheses)
 
+        bleu_1_tf = corpus_bleu(references, hypotheses_tf, weights=(1, 0, 0, 0))
+        bleu_2_tf = corpus_bleu(references, hypotheses_tf, weights=(0.5, 0.5, 0, 0))
+        bleu_3_tf = corpus_bleu(references, hypotheses_tf, weights=(0.33, 0.33, 0.33, 0))
+        bleu_4_tf = corpus_bleu(references, hypotheses_tf)
+
+        logging.info('VALIDATION\n')
         logging.info('Epoch: [{}]\t'
-                     'Batch: [{}]\t'
                      'Loss [{:.4f}]\t'
                      'Top 5 accuracy [{:.4f}]\t'
-                     'Top 1 accuracy [{:.4f}]\t'
+                     'Top 1 accuracy [{:.4f}]\n'
                      'bleu-1 [{:.3f}]\t'
                      'bleu-2 [{:.3f}]\t'
                      'bleu-3 [{:.3f}]\t'
-                     'bleu-4 [{:.3f}]\t'.format(epoch,
-                                                batch_id,
-                                                losses.avg,
-                                                top5.avg,
-                                                top1.avg,
-                                                bleu_1, bleu_2, bleu_3, bleu_4))
+                     'bleu-4 [{:.3f}]\n'
+                     'TF bleu-1 [{:.3f}]\t'
+                     'TF bleu-2 [{:.3f}]\t'
+                     'TF bleu-3 [{:.3f}]\t'
+                     'TF bleu-4 [{:.3f}]\t'.format(epoch, losses.avg, top5.avg, top1.avg, bleu_1, bleu_2,
+                                                   bleu_3, bleu_4, bleu_1_tf, bleu_2_tf, bleu_3_tf, bleu_4_tf))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Maximum Likelihood Estimation Training')
-    parser.add_argument('--batch-size', type=int, default=32)
+    parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--lr', type=float, default=1e-3)
+    parser.add_argument('--lr', type=float, default=4e-4)
     parser.add_argument('--step-size', type=float, default=5)
     parser.add_argument('--print-freq', type=int, default=50)
     parser.add_argument('--cnn-architecture', type=str, default='resnet152')
@@ -264,9 +268,10 @@ if __name__ == "__main__":
     parser.add_argument('--image-path', type=str, default='images')
     parser.add_argument('--dataset', type=str, default='flickr8k')
     parser.add_argument('--embedding-dim', type=int, default=512)
-    parser.add_argument('--checkpoint-filename', type=str, default='')
+    parser.add_argument('--checkpoint-filename', type=str, default='mle_gen-resnet152-1.pth')
     parser.add_argument('--use-image-features', type=bool, default=True)
     parser.add_argument('--attention-dim', type=int, default=512)
     parser.add_argument('--gru-units', type=int, default=512)
+    parser.add_argument('--max-len', type=int, default=20)
 
     main(parser.parse_args())
