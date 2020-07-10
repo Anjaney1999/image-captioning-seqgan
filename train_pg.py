@@ -172,13 +172,13 @@ def main(args):
                      word_index=word_index, args=args, encoder=None)
 
             torch.save({'gen_state_dict': generator.state_dict(), 'optimizer_state_dict': gen_optimizer.state_dict()},
-                       args.storage + '/ckpts/' + args.dataset + '/gen/{}-{}-{}.pth'.format('pg_gen',
+                       args.storage + '/ckpts/' + args.dataset + '/gen/{}_{}_{}.pth'.format('pg_gen',
                                                                                             args.cnn_architecture,
                                                                                             gen_epoch))
 
             torch.save(
                 {'dis_state_dict': discriminator.state_dict(), 'optimizer_state_dict': dis_optimizer.state_dict()},
-                args.storage + '/ckpts/' + args.dataset + '/dis/{}-{}-{}.pth'.format('pg_dis', args.cnn_architecture,
+                args.storage + '/ckpts/' + args.dataset + '/dis/{}_{}_{}.pth'.format('pg_dis', args.cnn_architecture,
                                                                                      gen_epoch))
             epoch_completed = True
 

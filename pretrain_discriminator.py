@@ -94,7 +94,7 @@ def main(args):
         torch.save({
             'dis_state_dict': discriminator.state_dict(),
             'optimizer_state_dict': dis_optimizer.state_dict()
-        }, args.storage + '/ckpts/' + args.dataset + '/dis/{}-{}-{}.pth'.format('pretrain_dis',
+        }, args.storage + '/ckpts/' + args.dataset + '/dis/{}_{}_{}.pth'.format('pretrain_dis',
                                                                                 args.cnn_architecture, e))
 
         logging.info('Completed epoch: ' + e)

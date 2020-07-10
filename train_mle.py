@@ -101,7 +101,7 @@ def main(args):
             'gen_state_dict': generator.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'scheduler_state_dict': scheduler.state_dict()
-        }, args.storage + '/ckpts/' + args.dataset + '/gen/{}-{}-{}.pth'.format('mle_gen', args.cnn_architecture, e))
+        }, args.storage + '/ckpts/' + args.dataset + '/gen/{}_{}_{}.pth'.format('mle_gen', args.cnn_architecture, e))
 
         scheduler.step()
 
