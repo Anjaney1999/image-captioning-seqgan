@@ -9,9 +9,9 @@ ckpts/flickr30k/gen/*.pth
 ckpts/flickr30k/dis/*.pth
 ckpts/coco/gen/*.pth
 ckpts/coco/dis/*.pth
-images/coco/*
-images/flickr8k/*
-images/flickr30k/*
+images/coco/*.jpg
+images/flickr8k/*.jpg
+images/flickr30k/*.jpg
 karpathy_splits/*
 processed_data/coco/*.json
 processed_data/coco/test/image_features/resnet101/*.npy
