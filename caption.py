@@ -18,7 +18,6 @@ data_transforms = transforms.Compose([
                          std=[0.229, 0.224, 0.225])
 ])
 
-
 def caption_image(encoder, generator, image_path, word_index, index_word, beam_size=5):
 
     vocab_size = len(word_index)
