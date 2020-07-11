@@ -23,16 +23,7 @@ from utils import *
 logging.basicConfig(level=logging.INFO)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-logging.info('Using device:', device)
 logging.info(torch.cuda.is_available())
-
-
-
-if device.type == 'cuda':
-    logging.info(torch.cuda.get_device_name(0))
-    logging.info('Memory Usage:')
-    logging.info('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
-    logging.info('Cached:   ', round(torch.cuda.memory_cached(0)/1024**3,1), 'GB')
 
 data_transforms = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -40,6 +31,7 @@ data_transforms = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225])
 ])
+
 
 def main(args):
     with open(args.storage + '/processed_data/' + args.dataset + '/word_index.json') as f:
