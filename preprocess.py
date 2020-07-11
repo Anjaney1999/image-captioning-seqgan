@@ -21,13 +21,14 @@ data_transforms = transforms.Compose([
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def process_data(dataset,
+def process_data(storage,
+                 dataset,
                  karpathy_split_path,
                  min_freq, 
                  dest_path,
                  max_caps_per_img
 ):
-    with open(karpathy_split_path + '/dataset_{}.json'.format(dataset), 'r') as f:
+    with open(storage + '/' + karpathy_split_path + '/dataset_{}.json'.format(dataset), 'r') as f:
         karpathy_split = json.load(f)
     
     caps_train = []
@@ -77,10 +78,10 @@ def process_data(dataset,
     
     index_word = {v: k for k, v in word_index.items()}
     
-    with open(os.path.join(dest_path, dataset, 'word_index.json'), 'w') as f:
+    with open(os.path.join(storage + '/' + dest_path, dataset, 'word_index.json'), 'w') as f:
         json.dump(word_index, f)
 
-    with open(os.path.join(dest_path, dataset, 'index_word.json'), 'w') as f:
+    with open(os.path.join(storage + '/' + dest_path, dataset, 'index_word.json'), 'w') as f:
         json.dump(index_word, f)
     
     enc_caps_train, cap_lens_train = encode_captions(caps_train, word_index, max_len)
@@ -90,31 +91,32 @@ def process_data(dataset,
     for img_name in caps_per_img:
         caps_per_img[img_name], _ = encode_captions(caps_per_img[img_name], word_index, max_len)
 
-    with open(os.path.join(dest_path, dataset, 'train', 'captions.json'), 'w') as f:
+    with open(os.path.join(storage + '/' + dest_path, dataset, 'train', 'captions.json'), 'w') as f:
         json.dump(enc_caps_train, f)
         
-    with open(os.path.join(dest_path, dataset, 'train', 'captions_len.json'), 'w') as f:
+    with open(os.path.join(storage + '/' + dest_path, dataset, 'train', 'captions_len.json'), 'w') as f:
         json.dump(cap_lens_train, f)
         
-    with open(os.path.join(dest_path, dataset, 'val', 'captions.json'), 'w') as f:
+    with open(os.path.join(storage + '/' + dest_path, dataset, 'val', 'captions.json'), 'w') as f:
         json.dump(enc_caps_val, f)
 
-    with open(os.path.join(dest_path, dataset, 'val', 'captions_len.json'), 'w') as f:
+    with open(os.path.join(storage + '/' + dest_path, dataset, 'val', 'captions_len.json'), 'w') as f:
         json.dump(cap_lens_val, f)
     
-    with open(os.path.join(dest_path, dataset, 'train', 'img_names.json'), 'w') as f:
+    with open(os.path.join(storage + '/' + dest_path, dataset, 'train', 'img_names.json'), 'w') as f:
         json.dump(img_names_train, f)
 
-    with open(os.path.join(dest_path, dataset, 'val', 'img_names.json'), 'w') as f:
+    with open(os.path.join(storage + '/' + dest_path, dataset, 'val', 'img_names.json'), 'w') as f:
         json.dump(img_names_val, f) 
     
-    with open(os.path.join(dest_path, dataset, 'val', 'caps_per_img.json'), 'w') as f:
+    with open(os.path.join(storage + '/' + dest_path, dataset, 'val', 'caps_per_img.json'), 'w') as f:
         json.dump(caps_per_img, f)
 
 
 def main(args):
 
-    process_data(args.dataset,
+    process_data(args.storage,
+                 args.dataset,
                  args.karpathy_split_path,
                  args.min_freq,
                  args.dest_path,
