@@ -10,7 +10,6 @@ import subprocess
 import torch.optim as optim
 from torch.utils.data.dataloader import DataLoader
 from torchvision import transforms
-
 try:
     from nltk.translate.bleu_score import corpus_bleu
 except:
@@ -21,18 +20,17 @@ from datasets import ImageCaptionDataset
 from models import *
 from utils import *
 
-logging.basicConfig(level=logging.INFO)
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logging.info('Using device:', device)
+logging.info(torch.cuda.is_available())
+
+logging.basicConfig(level=logging.INFO)
 
 if device.type == 'cuda':
     logging.info(torch.cuda.get_device_name(0))
     logging.info('Memory Usage:')
     logging.info('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
     logging.info('Cached:   ', round(torch.cuda.memory_cached(0)/1024**3,1), 'GB')
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 data_transforms = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -293,6 +291,6 @@ if __name__ == "__main__":
     parser.add_argument('--use-image-features', type=bool, default=True)
     parser.add_argument('--attention-dim', type=int, default=512)
     parser.add_argument('--gru-units', type=int, default=512)
-    parser.add_argument('--max-len', type=int, default=20)
+    parser.add_argument('--max-len', type=int, default=25)
 
     main(parser.parse_args())
