@@ -4,15 +4,33 @@ import json
 import logging
 import os.path as path
 import time
+import sys
+import subprocess
 
 import torch.optim as optim
-from nltk.translate.bleu_score import corpus_bleu
 from torch.utils.data.dataloader import DataLoader
 from torchvision import transforms
 
+try:
+    from nltk.translate.bleu_score import corpus_bleu
+except:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "nltk"])
+
+from nltk.translate.bleu_score import corpus_bleu
 from datasets import ImageCaptionDataset
 from models import *
 from utils import *
+
+logging.basicConfig(level=logging.INFO)
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+logging.info('Using device:', device)
+
+if device.type == 'cuda':
+    logging.info(torch.cuda.get_device_name(0))
+    logging.info('Memory Usage:')
+    logging.info('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
+    logging.info('Cached:   ', round(torch.cuda.memory_cached(0)/1024**3,1), 'GB')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -22,9 +40,6 @@ data_transforms = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225])
 ])
-
-logging.basicConfig(level=logging.INFO)
-
 
 def main(args):
     with open(args.storage + '/processed_data/' + args.dataset + '/word_index.json') as f:
