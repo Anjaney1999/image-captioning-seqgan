@@ -2,6 +2,11 @@ import argparse
 import csv
 import json
 import logging
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.nn.utils.rnn import pack_padded_sequence
+from torch.nn.utils.rnn import pad_packed_sequence
 import os.path as path
 import time
 import sys
