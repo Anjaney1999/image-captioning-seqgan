@@ -1,13 +1,10 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import json
-import torchvision.transforms as transforms
 import argparse
-from utils import pil_loader
+import json
+
+import torchvision.transforms as transforms
+
 from models import *
-import math
+from utils import pil_loader
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -100,7 +97,7 @@ def caption_image(encoder, generator, image_path, word_index, index_word, beam_s
     alpha = completed_sents_alphas[idx]
 
     for w in sentence:
-        print(index_word[str(w)])
+        print(index_word[str(w)], end=' ')
 
 
     #return words, alpha
@@ -156,20 +153,25 @@ def main(args):
     encoder.eval()
 
     with torch.no_grad():
-        caption_image(encoder, generator, args.image_path, word_index, index_word, beam_size=args.beam_size)
+        if args.greedy:
+            greedy_caption_image(encoder=encoder, generator=generator, image_path=args.image_path,
+                                 word_index=word_index, index_word=index_word)
+        else:
+            caption_image(encoder, generator, args.image_path, word_index, index_word, beam_size=args.beam_size)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Caption!')
     parser.add_argument('--model-path', type=str)
     parser.add_argument('--image-path', type=str)
-    parser.add_argument('--attention-dim', type=int, default=256)
-    parser.add_argument('--gru-units', type=int, default=256)
-    parser.add_argument('--embedding-dim', type=int, default=256)
+    parser.add_argument('--attention-dim', type=int, default=512)
+    parser.add_argument('--gru-units', type=int, default=512)
+    parser.add_argument('--embedding-dim', type=int, default=512)
     parser.add_argument('--cnn-architecture', type=str, default='resnet152')
     parser.add_argument('--storage', type=str, default='.')
     parser.add_argument('--dataset', type=str, default='flickr8k')
     parser.add_argument('--beam-size', type=int, default=20)
+    parser.add_argument('--greedy', type=bool, default=True)
 
     main(parser.parse_args())
 

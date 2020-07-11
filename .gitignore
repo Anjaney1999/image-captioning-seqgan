@@ -43,6 +43,12 @@ processed_data/flickr30k/val/image_features/resnet152/*.npy
 processed_data/flickr30k/test/*.json
 processed_data/flickr30k/train/*.json
 processed_data/flickr30k/val/*.json
+stats/coco/dis/*.csv
+stats/coco/gen/*.csv
+stats/flickr8k/gen/*.csv
+stats/flickr8k/dis/*.csv
+stats/flickr30k/gen/*.csv
+stats/flickr30k/dis/*.csv
 test_images/
 code.zip
 playground.ipynb
