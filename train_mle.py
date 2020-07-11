@@ -20,11 +20,13 @@ from datasets import ImageCaptionDataset
 from models import *
 from utils import *
 
+logging.basicConfig(level=logging.INFO)
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logging.info('Using device:', device)
 logging.info(torch.cuda.is_available())
 
-logging.basicConfig(level=logging.INFO)
+
 
 if device.type == 'cuda':
     logging.info(torch.cuda.get_device_name(0))
