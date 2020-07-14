@@ -432,7 +432,7 @@ if __name__ == "__main__":
     parser.add_argument('--gen-embedding-dim', type=int, default=512)
     parser.add_argument('--gen-gru-units', type=int, default=512)
     parser.add_argument('--attention-dim', type=int, default=512)
-    parser.add_argument('--gen-checkpoint-filename', type=str, default='mle_gen-resnet152-1.pth')
+    parser.add_argument('--gen-checkpoint-filename', type=str, default='')
     parser.add_argument('--dis-checkpoint-filename', type=str, default='')
     parser.add_argument('--use-image-features', type=bool, default=True)
 
