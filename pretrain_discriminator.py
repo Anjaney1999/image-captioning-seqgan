@@ -33,6 +33,8 @@ def main(args):
 
     vocab_size = len(word_index)
 
+    encoder = None
+
     generator = Generator(embedding_dim=args.gen_embedding_dim,
                           attention_dim=args.attention_dim,
                           gru_units=args.gen_gru_units,
@@ -45,9 +47,6 @@ def main(args):
                                      encoder_dim=2048)
 
     discriminator.to(device)
-
-    encoder = None
-    train_loader = None
 
     dis_optimizer = optim.Adam(discriminator.parameters(), lr=args.lr)
     dis_criterion = nn.BCELoss().to(device)
@@ -86,17 +85,15 @@ def main(args):
             batch_size=args.batch_size, shuffle=True, num_workers=0)
 
     for e in range(args.epochs):
-        train(epoch=e, generator=generator,
+        train(epoch=e, generator=generator, encoder=encoder,
               discriminator=discriminator, dis_optimizer=dis_optimizer,
               dis_criterion=dis_criterion, train_loader=train_loader,
-              word_index=word_index, args=args, encoder=None)
-
+              word_index=word_index, args=args)
         torch.save({
             'dis_state_dict': discriminator.state_dict(),
             'optimizer_state_dict': dis_optimizer.state_dict()
         }, args.storage + '/ckpts/' + args.dataset + '/dis/{}_{}_{}.pth'.format('pretrain_dis',
                                                                                 args.cnn_architecture, e))
-
         logging.info('Completed epoch: ' + e)
 
 

@@ -1,6 +1,8 @@
 import argparse
 import json
-
+from os import listdir
+from os.path import isfile, join
+from PIL import Image
 import torchvision.transforms as transforms
 
 from models import *
@@ -100,9 +102,6 @@ def caption_image(encoder, generator, image_path, word_index, index_word, beam_s
         print(index_word[str(w)], end=' ')
 
 
-    #return words, alpha
-
-
 def greedy_caption_image(encoder, generator, image_path, word_index, index_word):
     vocab_size = len(word_index)
 
@@ -128,7 +127,10 @@ def greedy_caption_image(encoder, generator, image_path, word_index, index_word)
         preds = generator.fc(hidden_state)
         input_word = torch.topk(preds, 1)[1]
         print(index_word[str(input_word.item())], end=' ')
+        if index_word[str(input_word.item())] == '<end>':
+            break
         i += 1
+
 
 def main(args):
 
@@ -152,18 +154,25 @@ def main(args):
 
     encoder.eval()
 
-    with torch.no_grad():
-        if args.greedy:
-            greedy_caption_image(encoder=encoder, generator=generator, image_path=args.image_path,
-                                 word_index=word_index, index_word=index_word)
-        else:
-            caption_image(encoder, generator, args.image_path, word_index, index_word, beam_size=args.beam_size)
+    image_file_names = [f for f in listdir(args.storage + '/test_images') if
+                        isfile(join(args.storage + '/test_images', f))]
+
+    for f in image_file_names:
+        image = Image.open(args.storage + '/test_images/' + f)
+        image.show()
+        with torch.no_grad():
+            if args.greedy:
+                greedy_caption_image(encoder=encoder, generator=generator,
+                                     image_path=args.storage + '/test_images/' + f, word_index=word_index,
+                                     index_word=index_word)
+            else:
+                caption_image(encoder, generator, args.storage + '/test_images/' + f, word_index, index_word,
+                              beam_size=20)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Caption!')
     parser.add_argument('--model-path', type=str)
-    parser.add_argument('--image-path', type=str)
     parser.add_argument('--attention-dim', type=int, default=512)
     parser.add_argument('--gru-units', type=int, default=512)
     parser.add_argument('--embedding-dim', type=int, default=512)
@@ -171,7 +180,7 @@ if __name__ == '__main__':
     parser.add_argument('--storage', type=str, default='.')
     parser.add_argument('--dataset', type=str, default='flickr8k')
     parser.add_argument('--beam-size', type=int, default=20)
-    parser.add_argument('--greedy', type=bool, default=True)
+    parser.add_argument('--greedy', type=bool, default=False)
 
     main(parser.parse_args())
 
