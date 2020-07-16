@@ -276,7 +276,7 @@ def validate(epoch,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Maximum Likelihood Estimation Training')
-    parser.add_argument('--batch-size', type=int, default=64)
+    parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--lr', type=float, default=4e-4)
     parser.add_argument('--step-size', type=float, default=5)

@@ -133,7 +133,7 @@ def main(args):
         val_img_feats_path = args.storage + '/processed_data/' + args.dataset + \
                             '/val/image_features/' + args.cnn_architecture
 
-        if len(os.listdir(train_img_feats_path)) == 0:
+        if len(os.listdir(train_img_feats_path)) <= 1:
 
             train_loader = DataLoader(
                 ImageDataset(split_type='train',
@@ -153,7 +153,7 @@ def main(args):
                     np.save(args.storage + '/processed_data/' + args.dataset + '/train/image_features/' +
                             args.cnn_architecture + '/' + name.split('/')[-1] + '.npy', feats.cpu().numpy())
 
-        if len(os.listdir(val_img_feats_path)) == 0:
+        if len(os.listdir(val_img_feats_path)) <= 1:
 
             val_loader = DataLoader(
                 ImageDataset(split_type='val',
@@ -181,7 +181,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', type=str, default='flickr8k')
     parser.add_argument('--cnn-architecture', type=str, default='resnet152')
     parser.add_argument('--karpathy-split-path', type=str, default='karpathy_splits')
-    parser.add_argument('--min-freq', type=int, default=5)
+    parser.add_argument('--min-freq', type=int, default=2)
     parser.add_argument('--dest-path', type=str, default='processed_data')
     parser.add_argument('--max-allowed-len', type=int, default=25)
     parser.add_argument('--image-path', type=str, default='images')
