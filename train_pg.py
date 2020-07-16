@@ -205,6 +205,7 @@ def main(args):
                     args.storage + '/ckpts/' + args.dataset + '/dis/{}_{}_{}_{}.pth'.format('pg_dis',
                                                                                             args.cnn_architecture,
                                                                                             gen_epoch, gen_batch_id))
+            completed_epoch = False
 
 
 def dis_train(imgs, caps, cap_lens, encoder, generator, discriminator, dis_optimizer, dis_criterion,
