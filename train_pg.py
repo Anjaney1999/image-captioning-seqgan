@@ -254,18 +254,16 @@ def rollout(samples, hidden_states, generator, discriminator, img_feats, word_in
     with torch.no_grad():
         rewards = []
         cap_len = max(sample_cap_lens)
-
         for i in range(rollout_num):
             for j in range(1, cap_len - 1):
-                incomplete_fake_caps = generator.sample(cap_len=max(cap_len, max_len) - (j + 1),
+                incomplete_fake_caps = generator.sample(cap_len=cap_len - (j + 1),
                                                         img_feats=img_feats,
                                                         input_word=samples[:, j], hidden_state=hidden_states[:, j - 1],
                                                         sampling_method='multinomial')
-
                 fake_caps = torch.cat([samples[:, :j + 1], incomplete_fake_caps], dim=-1)
                 fake_caps, fake_cap_lens = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
                 fake_caps = torch.from_numpy(fake_caps)
-                fake_cap_lens = torch.LongTensor(fake_cap_lens).to(device)
+                fake_cap_lens = torch.LongTensor(fake_cap_lens)
                 fake_caps = fake_caps.to(device)
                 reward = discriminator(img_feats, fake_caps, fake_cap_lens)
                 if i == 0:
@@ -286,7 +284,7 @@ def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, gen_optim
     generator.train()
     discriminator.eval()
 
-    imgs, caps, cap_lens = imgs.to(device), caps.to(device), cap_lens.to(device)
+    imgs, caps = imgs.to(device), caps.to(device)
 
     if not args.use_image_features:
         imgs = encoder(imgs)
@@ -302,7 +300,7 @@ def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, gen_optim
     # print('fake:')
     # for idxs in fake_caps.tolist():
     #     print([index_word[str(idx)] for idx in idxs])
-    fake_caps, fake_cap_lens = torch.LongTensor(fake_caps).to(device), torch.LongTensor(fake_cap_lens).to(device)
+    fake_caps, fake_cap_lens = torch.LongTensor(fake_caps).to(device), torch.LongTensor(fake_cap_lens)
     rewards = rollout(samples=fake_caps, sample_cap_lens=fake_cap_lens, hidden_states=hidden_states,
                       generator=generator, discriminator=discriminator, img_feats=imgs, word_index=word_index,
                       rollout_num=args.rollout_num, max_len=args.max_len)
@@ -421,7 +419,7 @@ def validate(epoch, encoder, generator, criterion, val_loader, word_index, args)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Adversarial Training via Policy Gradients')
     parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=1000)
+    parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--g-steps', type=int, default=1)
     parser.add_argument('--d-steps', type=int, default=4)
     parser.add_argument('--g-epochs', type=int, default=1)

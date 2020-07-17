@@ -92,11 +92,13 @@ def main(args):
               discriminator=discriminator, dis_optimizer=dis_optimizer,
               dis_criterion=dis_criterion, train_loader=train_loader,
               word_index=word_index, args=args, index_word=index_word)
-        torch.save({
-            'dis_state_dict': discriminator.state_dict(),
-            'optimizer_state_dict': dis_optimizer.state_dict()
-        }, args.storage + '/ckpts/' + args.dataset + '/dis/{}_{}_{}.pth'.format('pretrain_dis',
-                                                                                args.cnn_architecture, e))
+
+        if args.save_model:
+            torch.save({
+                'dis_state_dict': discriminator.state_dict(),
+                'optimizer_state_dict': dis_optimizer.state_dict()
+            }, args.storage + '/ckpts/' + args.dataset + '/dis/{}_{}_{}.pth'.format('pretrain_dis',
+                                                                                    args.cnn_architecture, e))
         logging.info('Completed epoch: ' + str(e))
 
 
@@ -114,34 +116,36 @@ def train(epoch, encoder, generator, discriminator, dis_optimizer, dis_criterion
     generator.eval()
 
     for batch_id, (imgs, caps, cap_lens) in enumerate(train_loader):
-        start_time = time.time()
 
-        imgs, caps = imgs.to(device), caps.to(device)
+        for _ in range(args.d_epochs):
+            start_time = time.time()
 
-        cap_lens = cap_lens.squeeze(-1)
+            imgs, caps = imgs.to(device), caps.to(device)
 
-        if not args.use_image_features:
-            imgs = encoder(imgs)
+            cap_lens = cap_lens.squeeze(-1)
 
-        dis_optimizer.zero_grad()
-        with torch.no_grad():
-            fake_caps, _ = generator.sample(cap_len=max(max(cap_lens), args.max_len) - 1, img_feats=imgs,
-                                            input_word=caps[:, 0], hidden_state=None, sampling_method='multinomial')
+            if not args.use_image_features:
+                imgs = encoder(imgs)
 
-        fake_caps, fake_cap_lens = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
-        fake_caps, fake_cap_lens = torch.LongTensor(fake_caps).to(device), torch.LongTensor(fake_cap_lens).to(device)
+            dis_optimizer.zero_grad()
+            with torch.no_grad():
+                fake_caps, _ = generator.sample(cap_len=max(max(cap_lens), args.max_len) - 1, img_feats=imgs,
+                                                input_word=caps[:, 0], hidden_state=None, sampling_method='multinomial')
 
-        real_preds = discriminator(imgs, caps, cap_lens)
-        fake_preds = discriminator(imgs, fake_caps, fake_cap_lens)
-        ones = torch.ones(caps.shape[0]).to(device)
-        zeros = torch.zeros(caps.shape[0]).to(device)
+            fake_caps, fake_cap_lens = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
+            fake_caps, fake_cap_lens = torch.LongTensor(fake_caps).to(device), torch.LongTensor(fake_cap_lens)
 
-        real_loss = dis_criterion(real_preds, ones)
-        fake_loss = dis_criterion(fake_preds, zeros)
-        loss = real_loss + fake_loss
+            real_preds = discriminator(imgs, caps, cap_lens)
+            fake_preds = discriminator(imgs, fake_caps, fake_cap_lens)
+            ones = torch.ones(caps.shape[0]).to(device)
+            zeros = torch.zeros(caps.shape[0]).to(device)
 
-        loss.backward()
-        dis_optimizer.step()
+            real_loss = dis_criterion(real_preds, ones)
+            fake_loss = dis_criterion(fake_preds, zeros)
+            loss = real_loss + fake_loss
+
+            loss.backward()
+            dis_optimizer.step()
 
         losses.update(loss.item())
 
@@ -163,7 +167,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Pre-train discriminator')
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--d-epochs', type=int, default=3)
+    parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--print-freq', type=int, default=50)
     parser.add_argument('--cnn-architecture', type=str, default='resnet152')
     parser.add_argument('--max-len', type=int, default=20)
@@ -178,5 +183,6 @@ if __name__ == "__main__":
     parser.add_argument('--gen-checkpoint-filename', type=str, default='mle_gen_resnet152_3.pth')
     parser.add_argument('--dis-checkpoint-filename', type=str, default='')
     parser.add_argument('--use-image-features', type=bool, default=True)
+    parser.add_argument('--save-model', type=bool, default=False)
 
     main(parser.parse_args())
