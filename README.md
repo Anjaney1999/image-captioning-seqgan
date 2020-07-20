@@ -13,9 +13,4 @@ To run the program:
 * Run pretrain_discriminator.py
 * Run train_pg.py
 
-
-The code I have written is based on the following awesome repositories:
-* https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Image-Captioning
-* https://github.com/X-czh/SeqGAN-PyTorch
-
 I intend to fully comment the code and also provides details regarding the best hyperparameters I am able to find.
