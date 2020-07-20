@@ -138,12 +138,8 @@ def train(epoch, encoder, generator, discriminator, dis_optimizer, dis_criterion
         fake_caps, fake_cap_lens = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
         fake_caps, fake_cap_lens = torch.LongTensor(fake_caps).to(device), torch.LongTensor(fake_cap_lens)
 
-        # print('fake', end=' ')
-        # print(fake_caps.shape)
-        # print(fake_caps)
-
         for _ in range(args.d_epochs):
-            indices = torch.randperm(caps.shape[0] * 2)
+            indices = torch.randperm(caps.shape[0] * 2).to(device)
             real_preds = discriminator(imgs, caps, cap_lens)
             fake_preds = discriminator(imgs, fake_caps, fake_cap_lens)
             inputs = torch.cat([real_preds, fake_preds], dim=0)
