@@ -12,7 +12,7 @@ ckpts/coco/dis/*.pth
 images/coco/*.jpg
 images/flickr8k/*.jpg
 images/flickr30k/*.jpg
-karpathy_splits/*
+karpathy_splits/*.json
 processed_data/coco/*.json
 processed_data/coco/test/image_features/resnet101/*.npy
 processed_data/coco/train/image_features/resnet101/*.npy
