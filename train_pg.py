@@ -93,8 +93,7 @@ def main(args):
     gen_mle_losses = AverageMeter()
     gen_pg_losses = AverageMeter()
     dis_losses = AverageMeter()
-    dis_acc_pos = AverageMeter()
-    dis_acc_neg = AverageMeter()
+    dis_acc = AverageMeter()
 
     gen_batch_id = 0
     dis_batch_id = 0
@@ -112,16 +111,15 @@ def main(args):
                 imgs, caps, cap_lens = next(gen_iter)
                 cap_lens = cap_lens.squeeze(-1)
                 avg_time_taken = 0.0
-                for _ in range(args.g_epochs):
-                    start_time = time.time()
-                    gen_train(imgs=imgs, caps=caps, cap_lens=cap_lens,
-                              generator=generator, discriminator=discriminator,
-                              gen_optimizer=gen_optimizer,
-                              gen_pg_criterion=gen_pg_criterion,
-                              gen_mle_criterion=gen_mle_criterion,
-                              word_index=word_index, args=args, encoder=encoder,
-                              pg_losses=gen_pg_losses, mle_losses=gen_mle_losses)
-                    avg_time_taken += time.time() - start_time
+                start_time = time.time()
+                gen_train(imgs=imgs, caps=caps, cap_lens=cap_lens,
+                          generator=generator, discriminator=discriminator,
+                          gen_optimizer=gen_optimizer,
+                          gen_pg_criterion=gen_pg_criterion,
+                          gen_mle_criterion=gen_mle_criterion,
+                          word_index=word_index, args=args, encoder=encoder,
+                          pg_losses=gen_pg_losses, mle_losses=gen_mle_losses)
+                avg_time_taken += time.time() - start_time
                 avg_time_taken /= args.g_epochs
                 if gen_batch_id % args.gen_print_freq == 0:
                     logging.info('GENERATOR: Epoch: [{}]\t'
@@ -153,39 +151,33 @@ def main(args):
                 imgs, caps, cap_lens = next(dis_iter)
                 cap_lens = cap_lens.squeeze(-1)
                 avg_time_taken = 0.0
-                for _ in range(args.d_epochs):
-                    start_time = time.time()
-                    dis_train(imgs=imgs, caps=caps, cap_lens=cap_lens,
-                              generator=generator, discriminator=discriminator,
-                              dis_optimizer=dis_optimizer, encoder=encoder,
-                              dis_criterion=dis_criterion, word_index=word_index,
-                              args=args, losses=dis_losses,
-                              acc_pos=dis_acc_pos, acc_neg=dis_acc_neg)
-                    avg_time_taken += time.time() - start_time
-
+                start_time = time.time()
+                dis_train(imgs=imgs, caps=caps, cap_lens=cap_lens,
+                          generator=generator, discriminator=discriminator,
+                          dis_optimizer=dis_optimizer, encoder=encoder,
+                          dis_criterion=dis_criterion, word_index=word_index,
+                          args=args, losses=dis_losses, acc=dis_acc)
+                avg_time_taken += time.time() - start_time
                 avg_time_taken /= args.d_epochs
                 if dis_batch_id % args.dis_print_freq == 0:
                     logging.info('DISCRIMINATOR: Epoch: [{}]\t'
                                  'Batch: [{}]\t'
                                  'Time per batch: [{:.3f}]\t'
                                  'Loss [{:.4f}]({:.3f})\t'
-                                 'Pos Accuracy [{:.4f}]({:.3f})\t'
-                                 'Neg Accuracy [{:.4f}]({:.3f})'.format(dis_epoch, dis_batch_id, avg_time_taken,
-                                                                        dis_losses.avg, dis_losses.val, dis_acc_pos.avg,
-                                                                        dis_acc_pos.val, dis_acc_neg.avg,
-                                                                        dis_acc_neg.val))
+                                 'Accuracy [{:.4f}]({:.3f})'.format(dis_epoch, dis_batch_id, avg_time_taken,
+                                                                        dis_losses.avg, dis_losses.val,
+                                                                        dis_acc.val, dis_acc.avg))
                     if args.save_stats:
                         with open(args.storage + '/stats/' + args.dataset + '/dis/train_dis.csv', 'a+') as file:
                             writer = csv.writer(file)
                             writer.writerow(
-                                [gen_epoch, dis_epoch, dis_batch_id, dis_losses.avg, dis_losses.val, dis_acc_pos.avg,
-                                 dis_acc_pos.val, dis_acc_neg.avg, dis_acc_neg.val])
+                                [gen_epoch, dis_epoch, dis_batch_id, dis_losses.avg, dis_losses.val,
+                                 dis_acc.val, dis_acc.avg])
                 dis_batch_id += 1
                 i += 1
             except StopIteration:
                 dis_losses.reset()
-                dis_acc_pos.reset()
-                dis_acc_neg.reset()
+                dis_acc.reset()
                 dis_epoch += 1
                 dis_batch_id = 0
                 logging.info('----------COMPLETED DISCRIMINATOR EPOCH: [{}]----------'.format(dis_epoch))
@@ -197,19 +189,21 @@ def main(args):
             if args.save_models:
                 torch.save(
                     {'gen_state_dict': generator.state_dict(), 'optimizer_state_dict': gen_optimizer.state_dict()},
-                    args.storage + '/ckpts/' + args.dataset + '/gen/{}_{}_{}_{}.pth'.format('pg_gen',
-                                                                                            args.cnn_architecture,
-                                                                                            gen_epoch, gen_batch_id))
+                    args.storage + '/ckpts/' + args.dataset + '/gen/{}_{}_{}_{}_{}.pth'.format('pg_gen',
+                                                                                               args.sampling_method,
+                                                                                               args.cnn_architecture,
+                                                                                               gen_epoch, gen_batch_id))
                 torch.save(
                     {'dis_state_dict': discriminator.state_dict(), 'optimizer_state_dict': dis_optimizer.state_dict()},
-                    args.storage + '/ckpts/' + args.dataset + '/dis/{}_{}_{}_{}.pth'.format('pg_dis',
-                                                                                            args.cnn_architecture,
-                                                                                            gen_epoch, gen_batch_id))
+                    args.storage + '/ckpts/' + args.dataset + '/dis/{}_{}_{}_{}_{}.pth'.format('pg_dis',
+                                                                                               args.sampling_method,
+                                                                                               args.cnn_architecture,
+                                                                                               gen_epoch, gen_batch_id))
             completed_epoch = False
 
 
 def dis_train(imgs, caps, cap_lens, encoder, generator, discriminator, dis_optimizer, dis_criterion,
-              word_index, losses, acc_pos, acc_neg, args):
+              word_index, losses, acc, args):
     if not args.use_image_features:
         encoder.eval()
     discriminator.train()
@@ -224,88 +218,89 @@ def dis_train(imgs, caps, cap_lens, encoder, generator, discriminator, dis_optim
     with torch.no_grad():
         fake_caps, _ = generator.sample(cap_len=max(max(cap_lens), args.max_len) - 1, img_feats=imgs,
                                         input_word=caps[:, 0],
-                                        hidden_state=None, sampling_method='multinomial')
+                                        hidden_state=None, sampling_method=args.sampling_method)
 
     fake_caps, fake_cap_lens = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
     fake_caps, fake_cap_lens = torch.LongTensor(fake_caps).to(device), torch.LongTensor(fake_cap_lens).to(device)
 
-    real_preds = discriminator(imgs, caps, cap_lens)
-    fake_preds = discriminator(imgs, fake_caps, fake_cap_lens)
+    for _ in range(args.d_epochs):
+        indices = torch.randperm(caps.shape[0] * 2)
+        real_preds = discriminator(imgs, caps, cap_lens)
+        fake_preds = discriminator(imgs, fake_caps, fake_cap_lens)
+        inputs = torch.cat([real_preds, fake_preds], dim=0)
+        inputs = inputs[indices]
+        ones = torch.ones(caps.shape[0]).to(device)
+        zeros = torch.zeros(caps.shape[0]).to(device)
+        targets = torch.cat([ones, zeros], dim=0)
+        targets = targets[indices]
+        loss = dis_criterion(inputs, targets)
 
-    ones = torch.ones(caps.shape[0]).to(device)
-    zeros = torch.zeros(caps.shape[0]).to(device)
-
-    real_loss = dis_criterion(real_preds, ones)
-    fake_loss = dis_criterion(fake_preds, zeros)
-
-    loss = real_loss + fake_loss
-
-    loss.backward()
-    dis_optimizer.step()
+        loss.backward()
+        dis_optimizer.step()
 
     losses.update(loss.item())
 
-    acc_pos.update(binary_accuracy(real_preds, label='pos').item())
-    acc_neg.update(binary_accuracy(fake_preds, label='neg').item())
+    acc.update(binary_accuracy(inputs, targets).item())
 
 
 def rollout(samples, hidden_states, generator, discriminator, img_feats, word_index, sample_cap_lens, rollout_num,
-            max_len):
+            max_len, sampling_method, use_rollout):
     with torch.no_grad():
-        rewards = []
-        cap_len = max(sample_cap_lens)
-        for i in range(rollout_num):
-            for j in range(1, cap_len - 1):
-                incomplete_fake_caps = generator.sample(cap_len=cap_len - (j + 1),
-                                                        img_feats=img_feats,
-                                                        input_word=samples[:, j], hidden_state=hidden_states[:, j - 1],
-                                                        sampling_method='multinomial')
-                fake_caps = torch.cat([samples[:, :j + 1], incomplete_fake_caps], dim=-1)
-                fake_caps, fake_cap_lens = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
-                fake_caps = torch.from_numpy(fake_caps)
-                fake_cap_lens = torch.LongTensor(fake_cap_lens)
-                fake_caps = fake_caps.to(device)
-                reward = discriminator(img_feats, fake_caps, fake_cap_lens)
-                if i == 0:
-                    rewards.append(reward)
-                else:
-                    rewards[j - 1] += reward
-        rewards = torch.stack(rewards) / (1.0 * rollout_num)
-        reward = discriminator(img_feats, samples, sample_cap_lens)
-        reward = reward.unsqueeze(0)
-        rewards = torch.cat((rewards, reward))
-        return rewards.permute(1, 0)
+        cap_len = torch.max(sample_cap_lens).item()
+        if use_rollout:
+            rewards = []
+            for i in range(rollout_num):
+                for j in range(1, cap_len - 1):
+                    incomplete_fake_caps = generator.sample(cap_len=max(cap_len, max_len) - (j + 1),
+                                                            img_feats=img_feats,
+                                                            input_word=samples[:, j], hidden_state=hidden_states[:, j - 1],
+                                                            sampling_method=sampling_method)
+                    fake_caps = torch.cat([samples[:, :j + 1], incomplete_fake_caps], dim=-1)
+                    fake_caps, fake_cap_lens = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
+                    fake_caps = torch.from_numpy(fake_caps)
+                    fake_cap_lens = torch.LongTensor(fake_cap_lens).to(device)
+                    fake_caps = fake_caps.to(device)
+                    reward = discriminator(img_feats, fake_caps, fake_cap_lens)
+                    if i == 0:
+                        rewards.append(reward)
+                    else:
+                        rewards[j - 1] += reward
+            rewards = torch.stack(rewards) / (1.0 * rollout_num)
+            reward = discriminator(img_feats, samples, sample_cap_lens)
+            reward = reward.unsqueeze(0)
+            rewards = torch.cat((rewards, reward))
+            return rewards.permute(1, 0)
+        else:
+            reward = discriminator(img_feats, samples, sample_cap_lens)
+            rewards = reward.unsqueeze(1).repeat(1, samples.shape[-1])
+            return rewards
 
 
 def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, gen_optimizer, gen_pg_criterion,
               gen_mle_criterion, word_index, pg_losses, mle_losses, args):
     if not args.use_image_features:
         encoder.eval()
-    generator.train()
     discriminator.eval()
 
-    imgs, caps = imgs.to(device), caps.to(device)
+    imgs, caps, cap_lens = imgs.to(device), caps.to(device), cap_lens.to(device)
 
     if not args.use_image_features:
         imgs = encoder(imgs)
-
-    gen_optimizer.zero_grad()
-
+    generator.eval()
     with torch.no_grad():
         fake_caps, hidden_states = generator.sample(cap_len=max(max(cap_lens), args.max_len) - 1, img_feats=imgs,
                                                     input_word=caps[:, 0],
-                                                    hidden_state=None, sampling_method='multinomial')
+                                                    hidden_state=None, sampling_method=args.sampling_method)
 
     fake_caps, fake_cap_lens = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
-    # print('fake:')
-    # for idxs in fake_caps.tolist():
-    #     print([index_word[str(idx)] for idx in idxs])
-    fake_caps, fake_cap_lens = torch.LongTensor(fake_caps).to(device), torch.LongTensor(fake_cap_lens)
+    fake_caps, fake_cap_lens = torch.LongTensor(fake_caps).to(device), torch.LongTensor(fake_cap_lens).to(device)
     rewards = rollout(samples=fake_caps, sample_cap_lens=fake_cap_lens, hidden_states=hidden_states,
                       generator=generator, discriminator=discriminator, img_feats=imgs, word_index=word_index,
-                      rollout_num=args.rollout_num, max_len=args.max_len)
+                      rollout_num=args.rollout_num, max_len=args.max_len, sampling_method=args.sampling_method,
+                      use_rollout=args.use_rollout)
     rewards = rewards.detach().to(device)
-
+    generator.train()
+    gen_optimizer.zero_grad()
     pg_preds, pg_caps, pg_output_lens, _, pg_indices = generator(imgs, fake_caps, fake_cap_lens)
     pg_preds = pack_padded_sequence(pg_preds, pg_output_lens, batch_first=True)[0]
     pg_targets = pack_padded_sequence(pg_caps[:, 1:], pg_output_lens, batch_first=True)[0]
@@ -322,7 +317,6 @@ def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, gen_optim
         mle_targets = pack_padded_sequence(mle_caps[:, 1:], mle_output_lens, batch_first=True)[0]
         mle_loss = gen_mle_criterion(mle_preds, mle_targets)
         loss += args.lambda2 * mle_loss
-
         mle_losses.update(mle_loss.item(), sum(mle_output_lens))
 
     loss.backward()
@@ -421,7 +415,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--g-steps', type=int, default=1)
-    parser.add_argument('--d-steps', type=int, default=4)
+    parser.add_argument('--d-steps', type=int, default=1)
     parser.add_argument('--g-epochs', type=int, default=1)
     parser.add_argument('--d-epochs', type=int, default=1)
     parser.add_argument('--gen-lr', type=float, default=1e-4)
@@ -430,23 +424,25 @@ if __name__ == "__main__":
     parser.add_argument('--lambda2', type=float, default=0.5)
     parser.add_argument('--val-freq', type=int, default=250)
     parser.add_argument('--gen-print-freq', type=int, default=50)
-    parser.add_argument('--dis-print-freq', type=int, default=100)
+    parser.add_argument('--dis-print-freq', type=int, default=50)
     parser.add_argument('--save-stats', type=bool, default=False)
     parser.add_argument('--save-models', type=bool, default=False)
     parser.add_argument('--cnn-architecture', type=str, default='resnet152')
     parser.add_argument('--storage', type=str, default='.')
     parser.add_argument('--image-path', type=str, default='images')
     parser.add_argument('--dataset', type=str, default='flickr8k')
+    parser.add_argument('--use-rollout', type=bool, default=True)
     parser.add_argument('--rollout-num', type=int, default=6)
     parser.add_argument('--max-len', type=int, default=20)
-    parser.add_argument('--clip', type=float, default=10.0)
-    parser.add_argument('--dis-embedding-dim', type=int, default=256)
-    parser.add_argument('--dis-gru-units', type=int, default=256)
+    parser.add_argument('--clip', type=float, default=5.0)
+    parser.add_argument('--dis-embedding-dim', type=int, default=512)
+    parser.add_argument('--dis-gru-units', type=int, default=512)
     parser.add_argument('--gen-embedding-dim', type=int, default=512)
     parser.add_argument('--gen-gru-units', type=int, default=512)
     parser.add_argument('--attention-dim', type=int, default=512)
     parser.add_argument('--gen-checkpoint-filename', type=str, default='mle_gen_resnet152_3.pth')
-    parser.add_argument('--dis-checkpoint-filename', type=str, default='pretrain_dis_resnet152_3.pth')
+    parser.add_argument('--dis-checkpoint-filename', type=str, default='pretrain_dis_multinomial_resnet152_1.pth')
     parser.add_argument('--use-image-features', type=bool, default=True)
+    parser.add_argument('--sampling-method', type=str, default='multinomial')
 
     main(parser.parse_args())

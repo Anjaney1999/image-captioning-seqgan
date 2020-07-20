@@ -51,8 +51,7 @@ stats/flickr30k/gen/*.csv
 stats/flickr30k/dis/*.csv
 test_images/
 code.zip
-playground.ipynb
-caption.ipynb
+*.ipynb
 
 
 

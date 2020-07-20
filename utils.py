@@ -29,12 +29,8 @@ def categorical_accuracy(preds, targets, k):
     return correct_total.item() * (100.0 / batch_size)
 
 
-def binary_accuracy(output, label='pos'):
-    acc = 0.0
-    if label == 'pos':
-        acc = (output >= 0.5).sum() / (1.0 * output.shape[0])
-    else:
-        acc = (output < 0.5).sum() / (1.0 * output.shape[0])
+def binary_accuracy(output, targets):
+    acc = (output.round() == targets).float().sum() / (1.0 * targets.shape[0])
     return acc * 100.0
 
 

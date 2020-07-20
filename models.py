@@ -144,7 +144,7 @@ class Generator(nn.Module):
 
                 if sampling_method == 'multinomial':
                     input_word = torch.multinomial(preds, 1)
-                    input_word = input_word.squeeze(1)
+                    input_word = input_word.squeeze(-1)
                 else:
                     input_word = torch.argmax(preds, 1)
                 samples.append(input_word)
@@ -159,7 +159,7 @@ class Generator(nn.Module):
                 preds, hidden_state = self.step(input_word, hidden_state, img_feats)
                 if sampling_method == 'multinomial':
                     input_word = torch.multinomial(preds, 1)
-                    input_word = input_word.squeeze(1)
+                    input_word = input_word.squeeze(-1)
                 else:
                     input_word = torch.argmax(preds, 1)
                 samples.append(input_word)
@@ -186,24 +186,15 @@ class GRUDiscriminator(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, img_feats, caps, cap_lens):
-
-        cap_lens, indices = cap_lens.sort(dim=0, descending=True)
-        img_feats = img_feats[indices]
-        caps = caps[indices]
-
         img_feats = img_feats.permute(0, 2, 1)
         img_feats = F.avg_pool1d(img_feats, img_feats.shape[-1]).squeeze(-1)
         img_feats = self.fc1(img_feats)
-
         embeddings = self.embedding(caps)
         inputs = torch.cat((img_feats.unsqueeze(1), embeddings), 1)
-        inputs_packed = pack_padded_sequence(inputs, cap_lens + 1, batch_first=True)
+        inputs_packed = pack_padded_sequence(inputs, cap_lens + 1, batch_first=True, enforce_sorted=False)
         outputs, _ = self.gru(inputs_packed)
         outputs = pad_packed_sequence(outputs, batch_first=True)[0]
-
         row_indices = torch.arange(0, caps.size(0)).long()
-        col_indices = cap_lens
-        last_hidden = outputs[row_indices, col_indices, :]
+        last_hidden = outputs[row_indices, cap_lens, :]
         pred = self.sigmoid(self.fc2(last_hidden))
-
         return pred.squeeze(-1)

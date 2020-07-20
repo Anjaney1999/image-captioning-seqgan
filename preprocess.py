@@ -131,7 +131,7 @@ def main(args):
                                '/train/image_features/' + args.cnn_architecture
 
         val_img_feats_path = args.storage + '/processed_data/' + args.dataset + \
-                            '/val/image_features/' + args.cnn_architecture
+                             '/val/image_features/' + args.cnn_architecture
 
         if len(os.listdir(train_img_feats_path)) <= 1:
 
