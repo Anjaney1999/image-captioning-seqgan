@@ -12,5 +12,3 @@ To run the program:
 * Run train_mle.py
 * Run pretrain_discriminator.py
 * Run train_pg.py
-
-I intend to fully comment the code and also provides details regarding the best hyperparameters I am able to find.
