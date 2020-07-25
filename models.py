@@ -115,6 +115,8 @@ class Generator(nn.Module):
         
         for t in range(max(output_lens)):
             context_vec, alpha = self.attention_net(img_feats, hidden_state)
+            gate = self.sigmoid(self.f_beta(hidden_state))
+            context_vec = gate * context_vec
             hidden_state = self.gru(torch.cat([embeddings[:, t],
                                                context_vec], dim=1), hidden_state)
             
@@ -127,18 +129,20 @@ class Generator(nn.Module):
     def step(self, input_word, hidden_state, img_feats):
         embeddings = self.embedding(input_word)
         context_vec, alpha = self.attention_net(img_feats, hidden_state)
+        gate = self.sigmoid(self.f_beta(hidden_state))
+        context_vec = gate * context_vec
         hidden_state = self.gru(torch.cat([embeddings, context_vec], dim=1), hidden_state)
         preds = self.softmax(self.fc(hidden_state))
 
         return preds, hidden_state
 
-    def sample(self, cap_len, img_feats, input_word, sampling_method='multinomial', hidden_state=None):
+    def sample(self, cap_len, col_shape, img_feats, input_word, sampling_method='multinomial', hidden_state=None):
 
-        samples = []
+        samples = torch.zeros(input_word.shape[0], col_shape).long().to(device)
         if hidden_state is None:
-            hidden_states = []
+            hidden_states = torch.zeros(input_word.shape[0], col_shape, self.gru_units).to(device)
             hidden_state = self.init_hidden_state(img_feats)
-            samples.append(input_word)
+            samples[:, 0] = input_word
             for i in range(cap_len):
                 preds, hidden_state = self.step(input_word, hidden_state, img_feats)
 
@@ -147,24 +151,22 @@ class Generator(nn.Module):
                     input_word = input_word.squeeze(-1)
                 else:
                     input_word = torch.argmax(preds, 1)
-                samples.append(input_word)
+                samples[:, i + 1] = input_word
+                hidden_states[:, i] = hidden_state
 
-                if i < (cap_len - 1):
-                    hidden_states.append(hidden_state)
-
-            return torch.stack(samples).permute(1, 0), torch.stack(hidden_states).permute(1, 0, 2)
+            return samples, hidden_states
 
         else:
-            for _ in range(cap_len):
+            for i in range(cap_len):
                 preds, hidden_state = self.step(input_word, hidden_state, img_feats)
                 if sampling_method == 'multinomial':
                     input_word = torch.multinomial(preds, 1)
                     input_word = input_word.squeeze(-1)
                 else:
                     input_word = torch.argmax(preds, 1)
-                samples.append(input_word)
+                samples[:, i] = input_word
 
-            return torch.stack(samples).permute(1, 0)
+            return samples
 
 
 class GRUDiscriminator(nn.Module):
@@ -193,7 +195,11 @@ class GRUDiscriminator(nn.Module):
         inputs = torch.cat((img_feats.unsqueeze(1), embeddings), 1)
         inputs_packed = pack_padded_sequence(inputs, cap_lens + 1, batch_first=True, enforce_sorted=False)
         outputs, _ = self.gru(inputs_packed)
-        outputs = pad_packed_sequence(outputs, batch_first=True)[0]
+        try:
+            outputs = pad_packed_sequence(outputs, batch_first=True)[0]
+        except:
+            print(outputs)
+            print(outputs.shape)
         row_indices = torch.arange(0, caps.size(0)).long()
         last_hidden = outputs[row_indices, cap_lens, :]
         pred = self.sigmoid(self.fc2(last_hidden))

@@ -53,7 +53,7 @@ def pad_generated_captions(caps, word_index):
     for i in range(caps.shape[0]):
         length_found = False
         for j in range(caps.shape[1]):
-            if caps[i][j] == word_index['<end>']:
+            if caps[i][j] == word_index['<end>'] or caps[i][j] == word_index['<pad>']:
                 true_lengths.append(j + 1)
                 np.put(caps[i], np.arange(j + 1, caps.shape[1]),
                        np.zeros(caps.shape[1] - (j + 1)))

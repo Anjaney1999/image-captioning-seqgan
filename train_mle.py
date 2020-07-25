@@ -152,6 +152,8 @@ def gen_mle_train(epoch,
 
         loss = criterion(preds, targets)
 
+        loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
+
         loss.backward()
 
         optimizer.step()
@@ -212,8 +214,8 @@ def validate(epoch,
             preds_clone = preds.clone()
             preds = pack_padded_sequence(preds, output_lens, batch_first=True)[0]
             targets = pack_padded_sequence(caps[:, 1:], output_lens, batch_first=True)[0]
-
             loss = criterion(preds, targets)
+            loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
             top1_acc = categorical_accuracy(preds, targets, 1)
             top1.update(top1_acc, sum(output_lens))
@@ -230,7 +232,8 @@ def validate(epoch,
                     refs.append(cap)
                 references.append(refs)
 
-            fake_caps, _ = generator.sample(cap_len=max(max(cap_lens), args.max_len), img_feats=imgs[indices],
+            fake_caps, _ = generator.sample(cap_len=max(max(cap_lens), args.max_len),
+                                            col_shape=caps.shape[1], img_feats=imgs[indices],
                                             input_word=caps[:, 0], sampling_method='max')
             word_idxs, _ = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
             for idxs in word_idxs.tolist():
@@ -279,6 +282,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--lr', type=float, default=4e-4)
+    parser.add_argument('--alpha-c', type=float, default=1.)
     parser.add_argument('--step-size', type=float, default=5)
     parser.add_argument('--print-freq', type=int, default=50)
     parser.add_argument('--cnn-architecture', type=str, default='resnet152')
@@ -290,6 +294,6 @@ if __name__ == "__main__":
     parser.add_argument('--use-image-features', type=bool, default=True)
     parser.add_argument('--attention-dim', type=int, default=512)
     parser.add_argument('--gru-units', type=int, default=512)
-    parser.add_argument('--max-len', type=int, default=25)
+    parser.add_argument('--max-len', type=int, default=20)
 
     main(parser.parse_args())
