@@ -151,10 +151,9 @@ def main(args):
                             with open(args.storage + '/stats/' + args.dataset +
                                       '/gen/{}_{}_{}_{}_{}_{}.csv'.format('pg_gen',
                                                                           args.rollout_num,
-                                                                          args.g_steps,
-                                                                          args.d_steps,
-                                                                          args.sampling_method,
-                                                                          args.cnn_architecture), 'a+') as file:
+                                                                          args.g_iters, args.d_iters,
+                                                                          args.sampling_method, args.cnn_architecture),
+                                      'a+') as file:
                                 writer = csv.writer(file)
                                 writer.writerow(
                                     [gen_epoch, gen_batch_id, gen_pg_losses.avg, gen_pg_losses.val, gen_mle_losses.avg,
@@ -194,11 +193,9 @@ def main(args):
                         if args.save_stats:
                             with open(args.storage + '/stats/' + args.dataset +
                                       '/dis/{}_{}_{}_{}_{}_{}.csv'.format('pg_dis',
-                                                                          args.rollout_num,
-                                                                          args.g_steps,
-                                                                          args.d_steps,
-                                                                          args.sampling_method,
-                                                                          args.cnn_architecture), 'a+') as file:
+                                                                          args.rollout_num, args.g_iters, args.d_iters,
+                                                                          args.sampling_method, args.cnn_architecture),
+                                      'a+') as file:
                                 writer = csv.writer(file)
                                 writer.writerow(
                                     [gen_epoch, gen_batch_id, dis_epoch, dis_batch_id, dis_losses.avg, dis_losses.val,
@@ -222,27 +219,16 @@ def main(args):
                     {'gen_state_dict': generator.state_dict(), 'optimizer_state_dict': gen_optimizer.state_dict(),
                      'gen_batch_id': gen_batch_id, 'gen_iteration': gen_iteration, 'gen_epoch': gen_epoch},
                     args.storage + '/ckpts/' + args.dataset +
-                    '/gen/{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_gen',
-                                                              epoch,
-                                                              gen_epoch,
-                                                              args.rollout_num,
-                                                              args.g_steps,
-                                                              args.d_steps,
-                                                              args.sampling_method,
+                    '/gen/{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_gen', epoch, gen_epoch, args.rollout_num,
+                                                              args.g_iters, args.d_iters, args.sampling_method,
                                                               args.cnn_architecture))
                 torch.save(
                     {'dis_state_dict': discriminator.state_dict(), 'optimizer_state_dict': dis_optimizer.state_dict(),
                      'dis_batch_id': dis_batch_id, 'dis_iteration': dis_iteration, 'dis_epoch': dis_epoch},
                     args.storage + '/ckpts/' + args.dataset +
-                    '/dis/{}_{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_dis',
-                                                                 epoch,
-                                                                 gen_epoch,
-                                                                 dis_epoch,
-                                                                 args.rollout_num,
-                                                                 args.g_steps,
-                                                                 args.d_steps,
-                                                                 args.sampling_method,
-                                                                 args.cnn_architecture))
+                    '/dis/{}_{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_dis', epoch, gen_epoch, dis_epoch,
+                                                                 args.rollout_num, args.g_iters, args.d_iters,
+                                                                 args.sampling_method, args.cnn_architecture))
             completed_epoch = False
 
 
@@ -253,11 +239,10 @@ def sample_from_start(imgs, caps, cap_lens, generator, word_index, args):
                                                     img_feats=imgs,
                                                     input_word=caps[:, 0],
                                                     hidden_state=None, sampling_method=args.sampling_method)
-
         fake_caps, fake_cap_lens = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
         fake_caps, fake_cap_lens = torch.LongTensor(fake_caps).to(device), torch.LongTensor(fake_cap_lens)
 
-        return fake_caps, fake_cap_lens, hidden_states
+    return fake_caps, fake_cap_lens, hidden_states
 
 
 def dis_train(imgs, caps, cap_lens, encoder, generator, discriminator, dis_optimizer, dis_criterion,
@@ -272,14 +257,13 @@ def dis_train(imgs, caps, cap_lens, encoder, generator, discriminator, dis_optim
 
     dis_optimizer.zero_grad()
 
-    indices = torch.randperm(caps.shape[0] * 2).to(device)
     inputs = torch.cat((caps, fake_caps), dim=0)
     input_lens = torch.cat((cap_lens, fake_cap_lens), dim=0)
     imgs = torch.cat((imgs, imgs), dim=0)
     ones = torch.ones(caps.shape[0]).to(device)
     zeros = torch.zeros(caps.shape[0]).to(device)
     targets = torch.cat((ones, zeros), dim=0)
-
+    indices = torch.randperm(caps.shape[0] * 2).to(device)
     preds = discriminator(imgs[indices], inputs[indices], input_lens[indices])
     loss = dis_criterion(preds, targets[indices])
     loss.backward()
@@ -298,7 +282,6 @@ def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, rollout, 
         imgs = encoder(imgs)
 
     fake_caps, fake_cap_lens, hidden_states = sample_from_start(imgs, caps, cap_lens, generator, word_index, args)
-
     rewards = rollout.get_reward(samples=fake_caps, sample_cap_lens=fake_cap_lens, hidden_states=hidden_states,
                                  discriminator=discriminator, img_feats=imgs, word_index=word_index,
                                  col_shape=caps.shape[1], args=args, index_word=index_word)
@@ -422,7 +405,6 @@ def validate(epoch, encoder, generator, criterion, val_loader, word_index, args)
                                                                 args.d_steps,
                                                                 args.sampling_method,
                                                                 args.cnn_architecture), 'a+') as file:
-
                 writer = csv.writer(file)
                 writer.writerow(
                     [epoch, batch_id, losses.avg, losses.val, top5.avg, top5.val, top1.avg, top1.val, bleu_1, bleu_2,
