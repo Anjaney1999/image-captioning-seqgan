@@ -122,6 +122,8 @@ def main(args):
     completed_epoch = False
 
     for epoch in range(args.epochs):
+        if gen_epoch == args.gen_epochs:
+            break
         for _ in range(args.g_steps):
             i = 0
             while i < args.g_iters:
@@ -220,24 +222,27 @@ def main(args):
                     {'gen_state_dict': generator.state_dict(), 'optimizer_state_dict': gen_optimizer.state_dict(),
                      'gen_batch_id': gen_batch_id, 'gen_iteration': gen_iteration, 'gen_epoch': gen_epoch},
                     args.storage + '/ckpts/' + args.dataset +
-                    '/gen/{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_gen',
-                                                           epoch,
-                                                           args.rollout_num,
-                                                           args.g_steps,
-                                                           args.d_steps,
-                                                           args.sampling_method,
-                                                           args.cnn_architecture))
+                    '/gen/{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_gen',
+                                                              epoch,
+                                                              gen_epoch,
+                                                              args.rollout_num,
+                                                              args.g_steps,
+                                                              args.d_steps,
+                                                              args.sampling_method,
+                                                              args.cnn_architecture))
                 torch.save(
                     {'dis_state_dict': discriminator.state_dict(), 'optimizer_state_dict': dis_optimizer.state_dict(),
                      'dis_batch_id': dis_batch_id, 'dis_iteration': dis_iteration, 'dis_epoch': dis_epoch},
                     args.storage + '/ckpts/' + args.dataset +
-                    '/dis/{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_dis',
-                                                           epoch,
-                                                           args.rollout_num,
-                                                           args.g_steps,
-                                                           args.d_steps,
-                                                           args.sampling_method,
-                                                           args.cnn_architecture))
+                    '/dis/{}_{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_dis',
+                                                                 epoch,
+                                                                 gen_epoch,
+                                                                 dis_epoch,
+                                                                 args.rollout_num,
+                                                                 args.g_steps,
+                                                                 args.d_steps,
+                                                                 args.sampling_method,
+                                                                 args.cnn_architecture))
             completed_epoch = False
 
 
@@ -427,7 +432,8 @@ def validate(epoch, encoder, generator, criterion, val_loader, word_index, args)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Adversarial Training via Policy Gradients')
     parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--epochs', type=int, default=1000)
+    parser.add_argument('--gen-epochs', type=int, default=5)
     parser.add_argument('--g-steps', type=int, default=1)
     parser.add_argument('--d-steps', type=int, default=1)
     parser.add_argument('--g-iters', type=int, default=1)
@@ -437,9 +443,9 @@ if __name__ == "__main__":
     parser.add_argument('--alpha-c', type=float, default=1.0)
     parser.add_argument('--lambda1', type=float, default=1.0)
     parser.add_argument('--lambda2', type=float, default=0.0)
-    parser.add_argument('--val-freq', type=int, default=10)
-    parser.add_argument('--gen-print-freq', type=int, default=5)
-    parser.add_argument('--dis-print-freq', type=int, default=10)
+    parser.add_argument('--val-freq', type=int, default=100)
+    parser.add_argument('--gen-print-freq', type=int, default=50)
+    parser.add_argument('--dis-print-freq', type=int, default=50)
     parser.add_argument('--save-stats', type=bool, default=False)
     parser.add_argument('--save-models', type=bool, default=True)
     parser.add_argument('--cnn-architecture', type=str, default='resnet152')
