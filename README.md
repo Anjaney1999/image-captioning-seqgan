@@ -3,7 +3,7 @@ This repository contains code for an image captioning model that is inspired by 
 * pretrain_discriminator.py: pretrain the discriminator, which is a GRU that takes the features of an image as its first input followed by its corresponding caption
 * train_pg.py: adversarial training using policy gradients as proposed in the SeqGAN paper
 
-Although the code is completely functional, the hyperparameters of the model are currently being tuned. I could not find a reliable implementation of the seqgan for image captioning. Therefore,  the best hyperparameters have to be found from scratch (research papers proposing similar models have been vague about how many iterations the discriminator is trained on for every iteration that the generator is trained on during adversarial training i.e., the generator-discriminator iterations ratio). When I say an iteration, I mean training on a single batch of data. During adversarial training, it is better to train the discriminator on more iterations than the generator (I have currently set the ratio to 4:1).
+The code is functional (if I do find bugs, I will try to fix it immediately). For the MLE stage, I have been able to get a BLEU-4 score of 0.197 on the validation set (without beam search) for Flickr8k. For the adversarial training stage, I was able to get the BLEU-4 score to rise to 0.21 from 0.197; however, I am still tuning the hyperparameters of the model. Research papers proposing similar models have been vague about how many iterations the discriminator is trained on for every iteration that the generator is trained on during adversarial training i.e., the generator-discriminator iterations ratio. During adversarial training, it is better to train the discriminator on more iterations than the generator (I am yet to find the ideal ratio). I have currently set the ratio to 10:1, mostly based on observations provided in https://arxiv.org/abs/1804.00861. 
 
 To run the program:
 * Place the data splits (http://cs.stanford.edu/people/karpathy/deepimagesent/caption_datasets.zip) provided by Andrej Karpathy in the karpathy_splits folder
@@ -12,5 +12,3 @@ To run the program:
 * Run train_mle.py
 * Run pretrain_discriminator.py
 * Run train_pg.py
-
-I intend to fully comment the code and also provides details regarding the best hyperparameters I am able to find.
