@@ -1,4 +1,4 @@
-This repository contains code for an image captioning model that is inspired by the Show, Attend and Tell paper (https://arxiv.org/abs/1502.03044) and the Sequence Generative Adversarial Network (SeqGAN) paper (https://arxiv.org/abs/1609.05473). For readability and convenience, the 3 main stages of the training process have been divided into 3 python scripts:
+This repository contains a Pytorch implementation of an image captioning model that is inspired by the Show, Attend and Tell paper (https://arxiv.org/abs/1502.03044) and the Sequence Generative Adversarial Network (SeqGAN) paper (https://arxiv.org/abs/1609.05473). For readability and convenience, the 3 main stages of the training process have been divided into 3 python scripts:
 * train_mle.py: pretraining the generator using Maximum Likelihood estimation (essentially the same as the Show, Attent and Tell model)
 * pretrain_discriminator.py: pretrain the discriminator, which is a GRU that takes the features of an image as its first input followed by its corresponding caption
 * train_pg.py: adversarial training using policy gradients as proposed in the SeqGAN paper
