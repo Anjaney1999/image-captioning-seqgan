@@ -170,7 +170,7 @@ def train(epoch, encoder, generator, discriminator, dis_optimizer, dis_criterion
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Pre-train discriminator')
     parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--print-freq', type=int, default=50)
     parser.add_argument('--sampling-method', type=str, default='multinomial')
@@ -188,5 +188,5 @@ if __name__ == "__main__":
     parser.add_argument('--dis-checkpoint-filename', type=str, default='')
     parser.add_argument('--use-image-features', type=bool, default=True)
     parser.add_argument('--save-model', type=bool, default=True)
-    parser.add_argument('--save-stats', type=bool, default=True)
+    parser.add_argument('--save-stats', type=bool, default=False)
     main(parser.parse_args())

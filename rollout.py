@@ -41,4 +41,4 @@ class Rollout(object):
             else:
                 reward = discriminator(img_feats, samples, sample_cap_lens)
                 rewards = reward.unsqueeze(1).repeat(1, col_shape)
-                return rewards.to(device)
+                return rewards

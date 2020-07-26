@@ -212,21 +212,23 @@ def main(args):
                     dis_iter = iter(train_loader)
 
         if epoch % args.val_freq == 0 or completed_epoch:
-            validate(epoch=gen_epoch, generator=generator, criterion=gen_mle_criterion, val_loader=val_loader,
+            validate(epoch=epoch, gen_epoch=gen_epoch, gen_batch_id=gen_batch_id, generator=generator,
+                     criterion=gen_mle_criterion, val_loader=val_loader,
                      word_index=word_index, args=args, encoder=encoder)
             if args.save_models:
                 torch.save(
                     {'gen_state_dict': generator.state_dict(), 'optimizer_state_dict': gen_optimizer.state_dict(),
                      'gen_batch_id': gen_batch_id, 'gen_iteration': gen_iteration, 'gen_epoch': gen_epoch},
                     args.storage + '/ckpts/' + args.dataset +
-                    '/gen/{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_gen', epoch, gen_epoch, args.rollout_num,
+                    '/gen/{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_gen', epoch, gen_epoch, gen_batch_id,
+                                                              args.rollout_num,
                                                               args.g_iters, args.d_iters, args.sampling_method,
                                                               args.cnn_architecture))
                 torch.save(
                     {'dis_state_dict': discriminator.state_dict(), 'optimizer_state_dict': dis_optimizer.state_dict(),
                      'dis_batch_id': dis_batch_id, 'dis_iteration': dis_iteration, 'dis_epoch': dis_epoch},
                     args.storage + '/ckpts/' + args.dataset +
-                    '/dis/{}_{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_dis', epoch, gen_epoch, dis_epoch,
+                    '/dis/{}_{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_dis', epoch, gen_epoch, dis_epoch, gen_batch_id,
                                                                  args.rollout_num, args.g_iters, args.d_iters,
                                                                  args.sampling_method, args.cnn_architecture))
             completed_epoch = False
@@ -285,7 +287,7 @@ def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, rollout, 
     rewards = rollout.get_reward(samples=fake_caps, sample_cap_lens=fake_cap_lens, hidden_states=hidden_states,
                                  discriminator=discriminator, img_feats=imgs, word_index=word_index,
                                  col_shape=caps.shape[1], args=args, index_word=index_word)
-    rewards = rewards.detach().to(device)
+    rewards = rewards.detach()
 
     generator.train()
     gen_optimizer.zero_grad()
@@ -303,11 +305,11 @@ def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, rollout, 
     loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
     if args.lambda2 != 0.0:
-        mle_preds, mle_caps, mle_output_lens, _, mle_indices = generator(imgs, caps, cap_lens)
+        mle_preds, mle_caps, mle_output_lens, mle_alphas, mle_indices = generator(imgs, caps, cap_lens)
         mle_preds = pack_padded_sequence(mle_preds, mle_output_lens, batch_first=True)[0]
         mle_targets = pack_padded_sequence(mle_caps[:, 1:], mle_output_lens, batch_first=True)[0]
         mle_loss = gen_mle_criterion(mle_preds, mle_targets)
-        loss += args.lambda2 * mle_loss
+        loss += args.lambda2 * (mle_loss + args.alpha_c * ((1. - mle_alphas.sum(dim=1)) ** 2).mean())
         mle_losses.update(mle_loss.item(), sum(mle_output_lens))
 
     loss.backward()
@@ -316,7 +318,7 @@ def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, rollout, 
     pg_losses.update(pg_loss.item(), sum(pg_output_lens))
 
 
-def validate(epoch, encoder, generator, criterion, val_loader, word_index, args):
+def validate(epoch, gen_epoch, gen_batch_id, encoder, generator, criterion, val_loader, word_index, args):
     losses = AverageMeter()
     top5 = AverageMeter()
     top1 = AverageMeter()
@@ -381,8 +383,10 @@ def validate(epoch, encoder, generator, criterion, val_loader, word_index, args)
         bleu_3_tf = corpus_bleu(references, hypotheses_tf, weights=(0.33, 0.33, 0.33, 0))
         bleu_4_tf = corpus_bleu(references, hypotheses_tf)
 
-        logging.info('VALIDATION\n')
-        logging.info('Epoch: [{}]\t'
+        logging.info('VALIDATION')
+        logging.info('ADV Epoch: [{}]\t'
+                     'GEN Epoch: [{}]\t'
+                     'Batch: [{}]\t'
                      'Loss [{:.4f}]\t'
                      'Top 5 accuracy [{:.4f}]\t'
                      'Top 1 accuracy [{:.4f}]\n'
@@ -393,18 +397,15 @@ def validate(epoch, encoder, generator, criterion, val_loader, word_index, args)
                      'TF bleu-1 [{:.3f}]\t'
                      'TF bleu-2 [{:.3f}]\t'
                      'TF bleu-3 [{:.3f}]\t'
-                     'TF bleu-4 [{:.3f}]\t'.format(epoch, losses.avg, top5.avg, top1.avg, bleu_1, bleu_2,
-                                                   bleu_3, bleu_4, bleu_1_tf, bleu_2_tf, bleu_3_tf, bleu_4_tf))
+                     'TF bleu-4 [{:.3f}]\t'.format(epoch, gen_epoch, gen_batch_id, losses.avg, top5.avg, top1.avg,
+                                                   bleu_1, bleu_2, bleu_3, bleu_4, bleu_1_tf, bleu_2_tf,
+                                                   bleu_3_tf, bleu_4_tf))
         if args.save_stats:
             with open(args.storage + '/stats/' + args.dataset +
-                      '/gen/{}_{}_{}_{}_{}_{}_{}_{}.csv'.format('val_pg_gen',
-                                                                epoch,
-                                                                batch_id,
-                                                                args.rollout_num,
-                                                                args.g_steps,
-                                                                args.d_steps,
-                                                                args.sampling_method,
-                                                                args.cnn_architecture), 'a+') as file:
+                      '/gen/{}_{}_{}_{}_{}_{}_{}_{}.csv'.format('val_pg_gen', epoch, gen_epoch, gen_batch_id,
+                                                                args.rollout_num, args.g_steps, args.d_steps,
+                                                                args.sampling_method, args.cnn_architecture),
+                      'a+') as file:
                 writer = csv.writer(file)
                 writer.writerow(
                     [epoch, batch_id, losses.avg, losses.val, top5.avg, top5.val, top1.avg, top1.val, bleu_1, bleu_2,
@@ -414,7 +415,7 @@ def validate(epoch, encoder, generator, criterion, val_loader, word_index, args)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Adversarial Training via Policy Gradients')
     parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=1000)
+    parser.add_argument('--epochs', type=int, default=2000)
     parser.add_argument('--gen-epochs', type=int, default=5)
     parser.add_argument('--g-steps', type=int, default=1)
     parser.add_argument('--d-steps', type=int, default=1)
@@ -434,14 +435,14 @@ if __name__ == "__main__":
     parser.add_argument('--storage', type=str, default='.')
     parser.add_argument('--image-path', type=str, default='images')
     parser.add_argument('--dataset', type=str, default='flickr8k')
-    parser.add_argument('--rollout-num', type=int, default=16)
+    parser.add_argument('--rollout-num', type=int, default=0)
     parser.add_argument('--max-len', type=int, default=20)
     parser.add_argument('--dis-embedding-dim', type=int, default=512)
     parser.add_argument('--dis-gru-units', type=int, default=512)
     parser.add_argument('--gen-embedding-dim', type=int, default=512)
     parser.add_argument('--gen-gru-units', type=int, default=512)
     parser.add_argument('--attention-dim', type=int, default=512)
-    parser.add_argument('--gen-checkpoint-filename', type=str, default='mle_gen_resnet152_5.pth')
+    parser.add_argument('--gen-checkpoint-filename', type=str, default='mle_gen_resnet152_9.pth')
     parser.add_argument('--dis-checkpoint-filename', type=str, default='pretrain_dis_9_multinomial_resnet152.pth')
     parser.add_argument('--use-image-features', type=bool, default=True)
     parser.add_argument('--sampling-method', type=str, default='multinomial')

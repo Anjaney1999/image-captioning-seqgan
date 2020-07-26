@@ -70,7 +70,7 @@ def main(args):
                                 use_img_feats=True, transform=None,
                                 img_src_path=None, cnn_architecture=args.cnn_architecture,
                                 processed_data_path=args.storage + '/processed_data'),
-            batch_size=args.batch_size, shuffle=True, num_workers=2)
+            batch_size=args.batch_size, shuffle=True, num_workers=1)
 
         val_loader = DataLoader(
             ImageCaptionDataset(dataset=args.dataset, split_type='val',
@@ -107,23 +107,18 @@ def main(args):
                  criterion=criterion, val_loader=val_loader,
                  word_index=word_index, args=args)
 
-        torch.save({
-            'gen_state_dict': generator.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'scheduler_state_dict': scheduler.state_dict()
-        }, args.storage + '/ckpts/' + args.dataset + '/gen/{}_{}_{}.pth'.format('mle_gen', args.cnn_architecture, e))
+        if args.save_model:
+            torch.save({
+                'gen_state_dict': generator.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict()
+            }, args.storage + '/ckpts/' + args.dataset + '/gen/{}_{}_{}.pth'.format('mle_gen', args.cnn_architecture,
+                                                                                    e))
 
         scheduler.step()
 
 
-def gen_mle_train(epoch,
-                  encoder,
-                  generator,
-                  optimizer,
-                  criterion,
-                  train_loader,
-                  args):
-
+def gen_mle_train(epoch, encoder, generator, optimizer, criterion, train_loader, args):
     losses = AverageMeter()
     top5 = AverageMeter()
     top1 = AverageMeter()
@@ -149,9 +144,7 @@ def gen_mle_train(epoch,
 
         preds = pack_padded_sequence(preds, output_lens, batch_first=True)[0]
         targets = pack_padded_sequence(caps[:, 1:], output_lens, batch_first=True)[0]
-
         loss = criterion(preds, targets)
-
         loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
         loss.backward()
@@ -175,9 +168,11 @@ def gen_mle_train(epoch,
                          'Top 1 accuracy [{:.4f}]({:.3f})\t'.format(epoch, batch_id, time.time() - start_time,
                                                                     losses.avg, losses.val, top5.avg, top5.val,
                                                                     top1.avg, top1.val))
-            with open(args.storage + '/stats/' + args.dataset + '/gen/train_mle_gen.csv', 'a+') as file:
-                writer = csv.writer(file)
-                writer.writerow([epoch, batch_id, losses.avg, losses.val, top5.avg, top5.val, top1.avg, top1.val])
+
+            if args.save_stats:
+                with open(args.storage + '/stats/' + args.dataset + '/gen/train_mle_gen.csv', 'a+') as file:
+                    writer = csv.writer(file)
+                    writer.writerow([epoch, batch_id, losses.avg, losses.val, top5.avg, top5.val, top1.avg, top1.val])
 
 
 def validate(epoch,
@@ -270,17 +265,18 @@ def validate(epoch,
                      'TF bleu-4 [{:.3f}]\t'.format(epoch, losses.avg, top5.avg, top1.avg, bleu_1, bleu_2,
                                                    bleu_3, bleu_4, bleu_1_tf, bleu_2_tf, bleu_3_tf, bleu_4_tf))
 
-        with open(args.storage + '/stats/' + args.dataset + '/gen/val_mle_gen.csv', 'a+') as file:
-            writer = csv.writer(file)
-            writer.writerow(
-                [epoch, batch_id, losses.avg, losses.val, top5.avg, top5.val, top1.avg, top1.val, bleu_1, bleu_2,
-                 bleu_3, bleu_4, bleu_1_tf, bleu_2_tf, bleu_3_tf, bleu_4_tf])
+        if args.save_stats:
+            with open(args.storage + '/stats/' + args.dataset + '/gen/val_mle_gen.csv', 'a+') as file:
+                writer = csv.writer(file)
+                writer.writerow(
+                    [epoch, batch_id, losses.avg, losses.val, top5.avg, top5.val, top1.avg, top1.val, bleu_1, bleu_2,
+                     bleu_3, bleu_4, bleu_1_tf, bleu_2_tf, bleu_3_tf, bleu_4_tf])
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Maximum Likelihood Estimation Training')
     parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--lr', type=float, default=4e-4)
     parser.add_argument('--alpha-c', type=float, default=1.)
     parser.add_argument('--step-size', type=float, default=5)
@@ -295,5 +291,7 @@ if __name__ == "__main__":
     parser.add_argument('--attention-dim', type=int, default=512)
     parser.add_argument('--gru-units', type=int, default=512)
     parser.add_argument('--max-len', type=int, default=20)
+    parser.add_argument('--save-model', type=bool, default=False)
+    parser.add_argument('--save-stats', type=bool, default=False)
 
     main(parser.parse_args())
