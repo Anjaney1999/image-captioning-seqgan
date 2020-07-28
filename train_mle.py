@@ -70,7 +70,7 @@ def main(args):
                                 use_img_feats=True, transform=None,
                                 img_src_path=None, cnn_architecture=args.cnn_architecture,
                                 processed_data_path=args.storage + '/processed_data'),
-            batch_size=args.batch_size, shuffle=True, num_workers=1)
+            batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
 
         val_loader = DataLoader(
             ImageCaptionDataset(dataset=args.dataset, split_type='val',
@@ -293,5 +293,6 @@ if __name__ == "__main__":
     parser.add_argument('--max-len', type=int, default=20)
     parser.add_argument('--save-model', type=bool, default=False)
     parser.add_argument('--save-stats', type=bool, default=False)
+    parser.add_argument('--workers', type=int, default=2)
 
     main(parser.parse_args())

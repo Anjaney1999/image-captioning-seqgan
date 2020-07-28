@@ -52,6 +52,8 @@ stats/flickr30k/dis/*.csv
 test_images/
 code.zip
 *.ipynb
+nlg-eval/
+pycocoevalcap/
 
 
 
