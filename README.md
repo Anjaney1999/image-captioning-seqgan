@@ -1,3 +1,5 @@
+***This repository is still in progress***
+
 This repository contains a Pytorch implementation of an image captioning model that is inspired by the Show, Attend and Tell paper (https://arxiv.org/abs/1502.03044) and the Sequence Generative Adversarial Network (SeqGAN) paper (https://arxiv.org/abs/1609.05473). This model has been proposed in the "Improving Image Captioning with Conditional Generative Adversarial Nets" paper (https://arxiv.org/abs/1805.07112). The only difference is that I will not be using evaluation metrics as feedback for the generator during adversarial training.
 For readability and convenience, the 3 main stages of the training process have been divided into 3 python scripts:
 * train_mle.py: pretraining the generator using Maximum Likelihood estimation (essentially the same as the Show, Attent and Tell model)
