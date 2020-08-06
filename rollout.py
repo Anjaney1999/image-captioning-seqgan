@@ -9,11 +9,15 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Rollout(object):
 
-    def __init__(self, generator):
-        self.rollout_generator = generator
+    def __init__(self, generator, update_rate):
+        self.rollout_generator = copy.deepcopy(generator)
+        self.rollout_generator.to(device)
+        self.train_generator = generator
+        self.update_rate = update_rate
 
     def get_reward(self, samples, hidden_states, discriminator, img_feats, word_index, sample_cap_lens, col_shape,
                    args, index_word):
+        self.rollout_generator.eval()
         with torch.no_grad():
             cap_len = torch.max(sample_cap_lens).item()
             if args.rollout_num > 0:
@@ -42,3 +46,14 @@ class Rollout(object):
                 reward = discriminator(img_feats, samples, sample_cap_lens)
                 rewards = reward.unsqueeze(1).repeat(1, col_shape)
                 return rewards
+
+    def update_params(self):
+        dic = {}
+        for name, param in self.train_generator.named_parameters():
+            dic[name] = param.data
+        for name, param in self.rollout_generator.named_parameters():
+            if name.startswith('emb'):
+                param.data = dic[name]
+            else:
+                param.data = self.update_rate * param.data + (1 - self.update_rate) * dic[name]
+

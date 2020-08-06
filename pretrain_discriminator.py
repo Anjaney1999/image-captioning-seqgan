@@ -67,7 +67,7 @@ def main(args):
 
     if args.use_image_features:
         train_loader = DataLoader(
-            ImageCaptionDataset(dataset=args.dataset, split_type='train',
+            ImageCaptionDataset(dataset=args.dataset, model='discriminator', split_type='train',
                                 use_img_feats=True, transform=None,
                                 img_src_path=None, cnn_architecture=args.cnn_architecture,
                                 processed_data_path=args.storage + '/processed_data'),
@@ -77,7 +77,7 @@ def main(args):
         encoder.to(device)
 
         train_loader = DataLoader(
-            ImageCaptionDataset(dataset=args.dataset, split_type='train',
+            ImageCaptionDataset(dataset=args.dataset, model='discriminator', split_type='train',
                                 use_img_feats=False, transform=data_transforms,
                                 img_src_path=args.storage + '/images',
                                 cnn_architecture=args.cnn_architecture,
@@ -123,32 +123,33 @@ def train(epoch, encoder, generator, discriminator, dis_optimizer, dis_criterion
     discriminator.train()
     generator.eval()
 
-    for batch_id, (imgs, caps, cap_lens) in enumerate(train_loader):
+    for batch_id, (imgs, mismatched_imgs, caps, cap_lens) in enumerate(train_loader):
 
         start_time = time.time()
 
-        imgs, caps = imgs.to(device), caps.to(device)
+        imgs, mismatched_imgs, caps = imgs.to(device), mismatched_imgs.to(device), caps.to(device)
         cap_lens = cap_lens.squeeze(-1)
 
         if not args.use_image_features:
             imgs = encoder(imgs)
+            mismatched_imgs = encoder(mismatched_imgs)
 
         fake_caps, fake_cap_lens, _ = sample_from_start(imgs, caps, cap_lens, generator, word_index, args)
-        dis_optimizer.zero_grad()
-        indices = torch.randperm(caps.shape[0] * 2).to(device)
-        inputs = torch.cat((caps, fake_caps), dim=0)
-        input_lens = torch.cat((cap_lens, fake_cap_lens), dim=0)
-        imgs = torch.cat((imgs, imgs), dim=0).to(device)
-        ones = torch.ones(caps.shape[0])
-        zeros = torch.zeros(caps.shape[0])
-        targets = torch.cat((ones, zeros), dim=0).to(device)
+        ones = torch.ones(caps.shape[0]).to(device)
+        zeros = torch.zeros(caps.shape[0]).to(device)
 
-        preds = discriminator(imgs[indices], inputs[indices], input_lens[indices])
-        loss = dis_criterion(preds, targets[indices])
+        dis_optimizer.zero_grad()
+        true_preds = discriminator(imgs, caps, cap_lens)
+        false_preds = discriminator(mismatched_imgs, caps, cap_lens)
+        fake_preds = discriminator(imgs, fake_caps, fake_cap_lens)
+        loss = dis_criterion(true_preds, ones) + 0.5 * dis_criterion(false_preds, zeros) + \
+               0.5 * dis_criterion(fake_preds, zeros)
         loss.backward()
         dis_optimizer.step()
         losses.update(loss.item())
-        acc.update(binary_accuracy(preds, targets[indices]).item())
+        acc.update(binary_accuracy(true_preds, ones).item())
+        acc.update(binary_accuracy(false_preds, zeros).item())
+        acc.update(binary_accuracy(fake_preds, zeros).item())
 
         if batch_id % args.print_freq == 0:
             logging.info('Epoch: [{}]\t'

@@ -5,9 +5,12 @@ import numpy as np
 
 from utils import pil_loader
 
+
 class ImageCaptionDataset(Dataset):
 
-    def __init__(self, dataset,
+    def __init__(self,
+                 dataset,
+                 model,
                  split_type,
                  use_img_feats,
                  transform,
@@ -23,6 +26,7 @@ class ImageCaptionDataset(Dataset):
         self.processed_data_path = processed_data_path
         self.dataset = dataset
         self.cnn_architecture = cnn_architecture
+        self.model = model
         
         with open(processed_data_path + '/' + dataset + '/' + split_type + '/img_names.json') as f:
             self.img_names = json.load(f)
@@ -52,11 +56,20 @@ class ImageCaptionDataset(Dataset):
 
             cap_len = torch.LongTensor([self.cap_lens[index]])
 
-            if self.split_type == 'train':  
-                return img_feats, cap, cap_len
+            if self.split_type == 'train':
+
+                if self.model == 'discriminator':
+                    mismatched_index = np.random.randint(len(self.img_names))
+                    mismatched_img_name = self.img_names[mismatched_index]
+                    mismatched_img_feats = np.load(self.processed_data_path + '/' +
+                                                   self.dataset + '/' + self.split_type +
+                                                   '/image_features/' + self.cnn_architecture + '/' +
+                                                   mismatched_img_name.split('/')[-1] + '.npy')
+                    mismatched_img_feats = torch.from_numpy(mismatched_img_feats)
+                    return img_feats, mismatched_img_feats, cap, cap_len
+                else:
+                    return img_feats, cap, cap_len
             else:
-                # matching_idxs = [idx for idx, path in enumerate(self.img_names) if path == img_name]
-                # all_captions = [self.caps[idx] for idx in matching_idxs]
                 all_caps = self.caps_per_img[img_name]
                 return img_feats, cap, cap_len, torch.LongTensor(all_caps)
         else:
@@ -67,8 +80,16 @@ class ImageCaptionDataset(Dataset):
             cap = torch.LongTensor(self.caps[index])
             cap_len = torch.LongTensor([self.cap_lens[index]])
 
-            if self.split_type == 'train':  
-                return img, cap, cap_len 
+            if self.split_type == 'train':
+                if self.model == 'discriminator':
+                    mismatched_index = np.random.randint(len(self.img_names))
+                    mismatched_img_name = self.img_names[mismatched_index]
+                    mismatched_img = pil_loader(self.img_src_path + '/' + self.dataset + '/' + mismatched_img_name)
+                    mismatched_img = self.transform(mismatched_img)
+                    mismatched_img = torch.FloatTensor(mismatched_img)
+                    return img, mismatched_img, cap, cap_len
+                else:
+                    return img, cap, cap_len
             else:
                 all_caps = self.caps_per_img[img_name]
                 return img, cap, cap_len, torch.LongTensor(all_caps)

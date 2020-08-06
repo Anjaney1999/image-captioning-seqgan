@@ -110,8 +110,8 @@ class Generator(nn.Module):
 
         output_lens = (cap_lens - 1).tolist()
         
-        preds = torch.zeros(batch_size, caps.shape[1] - 1, vocab_size).to(device)
-        alphas = torch.zeros(batch_size, caps.shape[1] - 1, num_pixels).to(device)
+        preds = torch.zeros(batch_size, caps.shape[1], vocab_size).to(device)
+        alphas = torch.zeros(batch_size, caps.shape[1], num_pixels).to(device)
         
         for t in range(max(output_lens)):
             context_vec, alpha = self.attention_net(img_feats, hidden_state)

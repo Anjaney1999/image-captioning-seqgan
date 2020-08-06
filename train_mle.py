@@ -53,7 +53,7 @@ def main(args):
     generator.to(device)
     optimizer = optim.Adam(generator.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=0.5)
-    criterion = nn.CrossEntropyLoss(ignore_index=word_index['<pad>']).to(device)
+    criterion = nn.CrossEntropyLoss(ignore_index=word_index['<pad>'], reduction='sum').to(device)
 
     if path.isfile(checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
@@ -66,14 +66,14 @@ def main(args):
 
     if args.use_image_features:
         train_loader = DataLoader(
-            ImageCaptionDataset(dataset=args.dataset, split_type='train',
+            ImageCaptionDataset(dataset=args.dataset, model='generator', split_type='train',
                                 use_img_feats=True, transform=None,
                                 img_src_path=None, cnn_architecture=args.cnn_architecture,
                                 processed_data_path=args.storage + '/processed_data'),
             batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
 
         val_loader = DataLoader(
-            ImageCaptionDataset(dataset=args.dataset, split_type='val',
+            ImageCaptionDataset(dataset=args.dataset, model='generator', split_type='val',
                                 use_img_feats=True, transform=None,
                                 img_src_path=None, cnn_architecture=args.cnn_architecture,
                                 processed_data_path=args.storage + '/processed_data'),
@@ -142,9 +142,14 @@ def gen_mle_train(epoch, encoder, generator, optimizer, criterion, train_loader,
 
         preds, caps, output_lens, alphas, indices = generator(imgs, caps, cap_lens)
 
+        loss = 0.0
+        for i in range(caps.shape[0]):
+            loss += criterion(preds[i, :], caps[i, 1:])
+
+        loss = loss / (1.0 * caps.shape[0])
         preds = pack_padded_sequence(preds, output_lens, batch_first=True)[0]
         targets = pack_padded_sequence(caps[:, 1:], output_lens, batch_first=True)[0]
-        loss = criterion(preds, targets)
+        # loss = criterion(preds, targets)
         loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
         loss.backward()
@@ -275,9 +280,9 @@ def validate(epoch,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Maximum Likelihood Estimation Training')
-    parser.add_argument('--batch-size', type=int, default=32)
+    parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=20)
-    parser.add_argument('--lr', type=float, default=4e-4)
+    parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--alpha-c', type=float, default=1.)
     parser.add_argument('--step-size', type=float, default=5)
     parser.add_argument('--print-freq', type=int, default=50)
@@ -291,7 +296,7 @@ if __name__ == "__main__":
     parser.add_argument('--attention-dim', type=int, default=512)
     parser.add_argument('--gru-units', type=int, default=512)
     parser.add_argument('--max-len', type=int, default=20)
-    parser.add_argument('--save-model', type=bool, default=False)
+    parser.add_argument('--save-model', type=bool, default=True)
     parser.add_argument('--save-stats', type=bool, default=False)
     parser.add_argument('--workers', type=int, default=2)
 

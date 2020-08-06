@@ -52,18 +52,25 @@ def main(args):
     gen_pg_criterion = nn.CrossEntropyLoss(reduction='none', ignore_index=word_index['<pad>']).to(device)
     gen_mle_criterion = nn.CrossEntropyLoss(ignore_index=word_index['<pad>']).to(device)
 
-    rollout = Rollout(generator)
+    rollout = Rollout(generator, 0.8)
 
     if args.use_image_features:
-        train_loader = DataLoader(
-            ImageCaptionDataset(dataset=args.dataset, split_type='train', use_img_feats=True, transform=None,
+        gen_train_loader = DataLoader(
+            ImageCaptionDataset(dataset=args.dataset, model='generator', split_type='train', use_img_feats=True,
+                                transform=None,
                                 img_src_path=None, cnn_architecture=args.cnn_architecture,
                                 processed_data_path=args.storage + '/processed_data'), batch_size=args.batch_size,
             shuffle=True, num_workers=1)
-        gen_iter = iter(train_loader)
-        dis_iter = iter(train_loader)
+        gen_iter = iter(gen_train_loader)
+        dis_train_loader = DataLoader(
+            ImageCaptionDataset(dataset=args.dataset, model='discriminator', split_type='train', use_img_feats=True,
+                                transform=None,
+                                img_src_path=None, cnn_architecture=args.cnn_architecture,
+                                processed_data_path=args.storage + '/processed_data'), batch_size=args.batch_size,
+            shuffle=True, num_workers=1)
+        dis_iter = iter(dis_train_loader)
         val_loader = DataLoader(
-            ImageCaptionDataset(dataset=args.dataset, split_type='val', use_img_feats=True, transform=None,
+            ImageCaptionDataset(dataset=args.dataset, model='generator', split_type='val', use_img_feats=True, transform=None,
                                 img_src_path=None, cnn_architecture=args.cnn_architecture,
                                 processed_data_path=args.storage + '/processed_data'), batch_size=args.batch_size,
             shuffle=True, num_workers=1)
@@ -88,8 +95,6 @@ def main(args):
 
     gen_batch_id = 0
     dis_batch_id = 0
-    gen_iteration = 0
-    dis_iteration = 0
     gen_epoch = 0
     dis_epoch = 0
 
@@ -101,7 +106,6 @@ def main(args):
         if args.gen_checkpoint_filename.split('_')[0] == 'pg':
             gen_optimizer.load_state_dict(checkpoint['gen_optimizer_state_dict'])
             gen_batch_id = checkpoint['gen_batch_id']
-            gen_iteration = checkpoint['gen_iteration']
             gen_epoch = checkpoint['gen_epoch']
 
     if path.isfile(dis_checkpoint_path):
@@ -111,7 +115,6 @@ def main(args):
         if args.dis_checkpoint_filename.split('_')[0] == 'pg':
             dis_optimizer.load_state_dict(checkpoint['dis_optimizer_state_dict'])
             dis_batch_id = checkpoint['dis_batch_id']
-            dis_iteration = checkpoint['dis_iteration']
             dis_epoch = checkpoint['dis_epoch']
 
     gen_mle_losses = AverageMeter()
@@ -124,92 +127,88 @@ def main(args):
     for epoch in range(args.epochs):
         if gen_epoch == args.gen_epochs:
             break
-        for _ in range(args.g_steps):
-            i = 0
-            while i < args.g_iters:
-                try:
-                    start_time = time.time()
-                    imgs, caps, cap_lens = next(gen_iter)
-                    cap_lens = cap_lens.squeeze(-1)
-                    gen_train(imgs=imgs, caps=caps, cap_lens=cap_lens,
-                              generator=generator, rollout=rollout, discriminator=discriminator,
-                              gen_optimizer=gen_optimizer, gen_pg_criterion=gen_pg_criterion,
-                              gen_mle_criterion=gen_mle_criterion, word_index=word_index,
-                              args=args, encoder=encoder,
-                              pg_losses=gen_pg_losses, mle_losses=gen_mle_losses, index_word=index_word)
-                    time_taken = time.time() - start_time
-                    if gen_iteration % args.gen_print_freq == 0:
-                        logging.info('GENERATOR: Epoch: [{}]\t'
-                                     'Batch: [{}]\t'
-                                     'Time per batch: [{:.3f}]\t'
-                                     'PG Loss [{:.4f}]({:.3f})\t'
-                                     'MLE Loss [{:.4f}]({:.3f})\t'.format(gen_epoch, gen_batch_id, time_taken,
-                                                                          gen_pg_losses.avg, gen_pg_losses.val,
-                                                                          gen_mle_losses.avg,
-                                                                          gen_mle_losses.val))
-                        if args.save_stats:
-                            with open(args.storage + '/stats/' + args.dataset +
-                                      '/gen/{}_{}_{}_{}_{}_{}.csv'.format('pg_gen',
-                                                                          args.rollout_num,
-                                                                          args.g_iters, args.d_iters,
-                                                                          args.sampling_method, args.cnn_architecture),
-                                      'a+') as file:
-                                writer = csv.writer(file)
-                                writer.writerow(
-                                    [gen_epoch, gen_batch_id, gen_pg_losses.avg, gen_pg_losses.val, gen_mle_losses.avg,
-                                     gen_mle_losses.val])
-                    gen_batch_id += 1
-                    gen_iteration += 1
-                    i += 1
-                except StopIteration:
-                    gen_batch_id = 0
-                    gen_pg_losses.reset()
-                    gen_mle_losses.reset()
-                    gen_epoch += 1
-                    logging.info('----------COMPLETED GENERATOR EPOCH: [{}]----------'.format(gen_epoch))
-                    gen_iter = iter(train_loader)
-                    completed_epoch = True
-        for _ in range(args.d_steps):
-            i = 0
-            while i < args.d_iters:
-                try:
-                    start_time = time.time()
-                    imgs, caps, cap_lens = next(dis_iter)
-                    cap_lens = cap_lens.squeeze(-1)
-                    dis_train(imgs=imgs, caps=caps, cap_lens=cap_lens,
-                              generator=generator, discriminator=discriminator,
-                              dis_optimizer=dis_optimizer, encoder=encoder,
-                              dis_criterion=dis_criterion, word_index=word_index,
-                              args=args, losses=dis_losses, acc=dis_acc)
-                    time_taken = time.time() - start_time
-                    if dis_iteration % args.dis_print_freq == 0:
-                        logging.info('DISCRIMINATOR: Epoch: [{}]\t'
-                                     'Batch: [{}]\t'
-                                     'Time per batch: [{:.3f}]\t'
-                                     'Loss [{:.4f}]({:.3f})\t'
-                                     'Accuracy [{:.4f}]({:.3f})'.format(dis_epoch, dis_batch_id, time_taken,
-                                                                        dis_losses.avg, dis_losses.val,
-                                                                        dis_acc.val, dis_acc.avg))
-                        if args.save_stats:
-                            with open(args.storage + '/stats/' + args.dataset +
-                                      '/dis/{}_{}_{}_{}_{}_{}.csv'.format('pg_dis',
-                                                                          args.rollout_num, args.g_iters, args.d_iters,
-                                                                          args.sampling_method, args.cnn_architecture),
-                                      'a+') as file:
-                                writer = csv.writer(file)
-                                writer.writerow(
-                                    [gen_epoch, gen_batch_id, dis_epoch, dis_batch_id, dis_losses.avg, dis_losses.val,
-                                     dis_acc.val, dis_acc.avg])
-                    dis_batch_id += 1
-                    dis_iteration += 1
-                    i += 1
-                except StopIteration:
-                    dis_losses.reset()
-                    dis_acc.reset()
-                    dis_epoch += 1
-                    dis_batch_id = 0
-                    logging.info('----------COMPLETED DISCRIMINATOR EPOCH: [{}]----------'.format(dis_epoch))
-                    dis_iter = iter(train_loader)
+        i = 0
+        while i < args.g_steps:
+            try:
+                start_time = time.time()
+                imgs, caps, cap_lens = next(gen_iter)
+                cap_lens = cap_lens.squeeze(-1)
+                gen_train(imgs=imgs, caps=caps, cap_lens=cap_lens,
+                          generator=generator, rollout=rollout, discriminator=discriminator,
+                          gen_optimizer=gen_optimizer, gen_pg_criterion=gen_pg_criterion,
+                          gen_mle_criterion=gen_mle_criterion, word_index=word_index,
+                          args=args, encoder=encoder,
+                          pg_losses=gen_pg_losses, mle_losses=gen_mle_losses, index_word=index_word)
+                time_taken = time.time() - start_time
+                if gen_batch_id % args.gen_print_freq == 0:
+                    logging.info('GENERATOR: Epoch: [{}]\t'
+                                 'Batch: [{}]\t'
+                                 'Time per batch: [{:.3f}]\t'
+                                 'PG Loss [{:.4f}]({:.3f})\t'
+                                 'MLE Loss [{:.4f}]({:.3f})\t'.format(gen_epoch, gen_batch_id, time_taken,
+                                                                      gen_pg_losses.avg, gen_pg_losses.val,
+                                                                      gen_mle_losses.avg,
+                                                                      gen_mle_losses.val))
+                    if args.save_stats:
+                        with open(args.storage + '/stats/' + args.dataset +
+                                  '/gen/{}_{}_{}_{}_{}_{}.csv'.format('pg_gen',
+                                                                      args.rollout_num,
+                                                                      args.g_steps, args.d_steps,
+                                                                      args.sampling_method, args.cnn_architecture),
+                                  'a+') as file:
+                            writer = csv.writer(file)
+                            writer.writerow(
+                                [gen_epoch, gen_batch_id, gen_pg_losses.avg, gen_pg_losses.val, gen_mle_losses.avg,
+                                 gen_mle_losses.val])
+                gen_batch_id += 1
+                i += 1
+            except StopIteration:
+                gen_batch_id = 0
+                gen_pg_losses.reset()
+                gen_mle_losses.reset()
+                gen_epoch += 1
+                logging.info('----------COMPLETED GENERATOR EPOCH: [{}]----------'.format(gen_epoch))
+                gen_iter = iter(gen_train_loader)
+                completed_epoch = True
+        i = 0
+        while i < args.d_steps:
+            try:
+                start_time = time.time()
+                imgs, mismatched_imgs, caps, cap_lens = next(dis_iter)
+                cap_lens = cap_lens.squeeze(-1)
+                dis_train(imgs=imgs, mismatched_imgs=mismatched_imgs, caps=caps, cap_lens=cap_lens,
+                          generator=generator, discriminator=discriminator,
+                          dis_optimizer=dis_optimizer, encoder=encoder,
+                          dis_criterion=dis_criterion, word_index=word_index,
+                          args=args, losses=dis_losses, acc=dis_acc)
+                time_taken = time.time() - start_time
+                if dis_batch_id % args.dis_print_freq == 0:
+                    logging.info('DISCRIMINATOR: Epoch: [{}]\t'
+                                 'Batch: [{}]\t'
+                                 'Time per batch: [{:.3f}]\t'
+                                 'Loss [{:.4f}]({:.3f})\t'
+                                 'Accuracy [{:.4f}]({:.3f})'.format(dis_epoch, dis_batch_id, time_taken,
+                                                                    dis_losses.avg, dis_losses.val,
+                                                                    dis_acc.val, dis_acc.avg))
+                    if args.save_stats:
+                        with open(args.storage + '/stats/' + args.dataset +
+                                  '/dis/{}_{}_{}_{}_{}_{}.csv'.format('pg_dis',
+                                                                      args.rollout_num, args.g_steps, args.d_steps,
+                                                                      args.sampling_method, args.cnn_architecture),
+                                  'a+') as file:
+                            writer = csv.writer(file)
+                            writer.writerow(
+                                [gen_epoch, gen_batch_id, dis_epoch, dis_batch_id, dis_losses.avg, dis_losses.val,
+                                 dis_acc.val, dis_acc.avg])
+                dis_batch_id += 1
+                i += 1
+            except StopIteration:
+                dis_losses.reset()
+                dis_acc.reset()
+                dis_epoch += 1
+                dis_batch_id = 0
+                logging.info('----------COMPLETED DISCRIMINATOR EPOCH: [{}]----------'.format(dis_epoch))
+                dis_iter = iter(dis_train_loader)
 
         if epoch % args.val_freq == 0 or completed_epoch:
             validate(epoch=epoch, gen_epoch=gen_epoch, gen_batch_id=gen_batch_id, generator=generator,
@@ -218,20 +217,21 @@ def main(args):
             if args.save_models:
                 torch.save(
                     {'gen_state_dict': generator.state_dict(), 'optimizer_state_dict': gen_optimizer.state_dict(),
-                     'gen_batch_id': gen_batch_id, 'gen_iteration': gen_iteration, 'gen_epoch': gen_epoch},
+                     'gen_batch_id': gen_batch_id, 'gen_epoch': gen_epoch},
                     args.storage + '/ckpts/' + args.dataset +
                     '/gen/{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_gen', epoch, gen_epoch, gen_batch_id,
-                                                              args.rollout_num,
-                                                              args.g_iters, args.d_iters, args.sampling_method,
-                                                              args.cnn_architecture))
+                                                              args.rollout_num, args.g_steps, args.d_steps,
+                                                              args.sampling_method, args.cnn_architecture))
                 torch.save(
                     {'dis_state_dict': discriminator.state_dict(), 'optimizer_state_dict': dis_optimizer.state_dict(),
-                     'dis_batch_id': dis_batch_id, 'dis_iteration': dis_iteration, 'dis_epoch': dis_epoch},
+                     'dis_batch_id': dis_batch_id, 'dis_epoch': dis_epoch},
                     args.storage + '/ckpts/' + args.dataset +
                     '/dis/{}_{}_{}_{}_{}_{}_{}_{}_{}.pth'.format('pg_dis', epoch, gen_epoch, dis_epoch, gen_batch_id,
-                                                                 args.rollout_num, args.g_iters, args.d_iters,
+                                                                 args.rollout_num, args.g_steps, args.d_steps,
                                                                  args.sampling_method, args.cnn_architecture))
             completed_epoch = False
+
+        rollout.update_params()
 
 
 def sample_from_start(imgs, caps, cap_lens, generator, word_index, args):
@@ -247,32 +247,30 @@ def sample_from_start(imgs, caps, cap_lens, generator, word_index, args):
     return fake_caps, fake_cap_lens, hidden_states
 
 
-def dis_train(imgs, caps, cap_lens, encoder, generator, discriminator, dis_optimizer, dis_criterion,
+def dis_train(imgs, mismatched_imgs, caps, cap_lens, encoder, generator, discriminator, dis_optimizer, dis_criterion,
               word_index, losses, acc, args):
     discriminator.train()
     generator.eval()
-    imgs, caps = imgs.to(device), caps.to(device)
+    imgs, mismatched_imgs, caps = imgs.to(device), mismatched_imgs.to(device), caps.to(device)
     if not args.use_image_features:
         imgs = encoder(imgs)
+        mismatched_imgs = encoder(mismatched_imgs)
 
     fake_caps, fake_cap_lens, _ = sample_from_start(imgs, caps, cap_lens, generator, word_index, args)
-
-    dis_optimizer.zero_grad()
-
-    inputs = torch.cat((caps, fake_caps), dim=0)
-    input_lens = torch.cat((cap_lens, fake_cap_lens), dim=0)
-    imgs = torch.cat((imgs, imgs), dim=0)
     ones = torch.ones(caps.shape[0]).to(device)
     zeros = torch.zeros(caps.shape[0]).to(device)
-    targets = torch.cat((ones, zeros), dim=0)
-    indices = torch.randperm(caps.shape[0] * 2).to(device)
-    preds = discriminator(imgs[indices], inputs[indices], input_lens[indices])
-    loss = dis_criterion(preds, targets[indices])
+    dis_optimizer.zero_grad()
+    true_preds = discriminator(imgs, caps, cap_lens)
+    false_preds = discriminator(mismatched_imgs, caps, cap_lens)
+    fake_preds = discriminator(imgs, fake_caps, fake_cap_lens)
+    loss = dis_criterion(true_preds, ones) + 0.5 * dis_criterion(false_preds, zeros) + \
+           0.5 * dis_criterion(fake_preds, zeros)
     loss.backward()
     dis_optimizer.step()
-
     losses.update(loss.item())
-    acc.update(binary_accuracy(preds, targets[indices]).item())
+    acc.update(binary_accuracy(true_preds, ones).item())
+    acc.update(binary_accuracy(false_preds, zeros).item())
+    acc.update(binary_accuracy(fake_preds, zeros).item())
 
 
 def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, rollout, gen_optimizer, gen_pg_criterion,
@@ -287,20 +285,26 @@ def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, rollout, 
     rewards = rollout.get_reward(samples=fake_caps, sample_cap_lens=fake_cap_lens, hidden_states=hidden_states,
                                  discriminator=discriminator, img_feats=imgs, word_index=word_index,
                                  col_shape=caps.shape[1], args=args, index_word=index_word)
-    rewards = rewards.detach()
 
     generator.train()
     gen_optimizer.zero_grad()
 
     pg_preds, pg_caps, pg_output_lens, alphas, pg_indices = generator(imgs, fake_caps, fake_cap_lens)
-    pg_preds = pack_padded_sequence(pg_preds, pg_output_lens, batch_first=True)[0]
-    pg_targets = pack_padded_sequence(pg_caps[:, 1:], pg_output_lens, batch_first=True)[0]
     rewards = rewards[pg_indices]
-    rewards = pack_padded_sequence(rewards, pg_output_lens, batch_first=True)[0]
+    rewards = rewards.cpu().numpy()
+    rewards = torch.from_numpy(rewards).to(device)
+    pg_loss = 0.0
+    for i in range(caps.shape[0]):
+        pg_loss += torch.sum(gen_pg_criterion(pg_preds[i, :pg_output_lens[i]],
+                                              pg_caps[i, 1:pg_output_lens[i] + 1]) * rewards[i, :pg_output_lens[i]])
+    pg_loss = pg_loss / (1.0 * caps.shape[0])
+    # pg_preds = pack_padded_sequence(pg_preds, pg_output_lens, batch_first=True)[0]
+    # pg_targets = pack_padded_sequence(pg_caps[:, 1:], pg_output_lens, batch_first=True)[0]
+    # rewards = pack_padded_sequence(rewards, pg_output_lens, batch_first=True)[0]
 
-    pg_loss = gen_pg_criterion(pg_preds, pg_targets)
-    pg_loss = pg_loss * rewards
-    pg_loss = torch.mean(pg_loss)
+    # pg_loss = gen_pg_criterion(pg_preds, pg_targets)
+    # pg_loss = pg_loss * rewards
+    # pg_loss = torch.mean(pg_loss)
     loss = args.lambda1 * pg_loss
     loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
 
@@ -313,8 +317,8 @@ def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, rollout, 
         mle_losses.update(mle_loss.item(), sum(mle_output_lens))
 
     loss.backward()
+    torch.nn.utils.clip_grad_norm_(generator.parameters(), 5.0)
     gen_optimizer.step()
-
     pg_losses.update(pg_loss.item(), sum(pg_output_lens))
 
 
@@ -415,35 +419,33 @@ def validate(epoch, gen_epoch, gen_batch_id, encoder, generator, criterion, val_
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Adversarial Training via Policy Gradients')
     parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=2000)
+    parser.add_argument('--epochs', type=int, default=6000)
     parser.add_argument('--gen-epochs', type=int, default=5)
     parser.add_argument('--g-steps', type=int, default=1)
-    parser.add_argument('--d-steps', type=int, default=1)
-    parser.add_argument('--g-iters', type=int, default=1)
-    parser.add_argument('--d-iters', type=int, default=10)
+    parser.add_argument('--d-steps', type=int, default=5)
     parser.add_argument('--gen-lr', type=float, default=1e-4)
     parser.add_argument('--dis-lr', type=float, default=1e-4)
     parser.add_argument('--alpha-c', type=float, default=1.0)
     parser.add_argument('--lambda1', type=float, default=1.0)
     parser.add_argument('--lambda2', type=float, default=0.0)
-    parser.add_argument('--val-freq', type=int, default=100)
+    parser.add_argument('--val-freq', type=int, default=400)
     parser.add_argument('--gen-print-freq', type=int, default=50)
     parser.add_argument('--dis-print-freq', type=int, default=50)
     parser.add_argument('--save-stats', type=bool, default=False)
-    parser.add_argument('--save-models', type=bool, default=True)
+    parser.add_argument('--save-models', type=bool, default=False)
     parser.add_argument('--cnn-architecture', type=str, default='resnet152')
     parser.add_argument('--storage', type=str, default='.')
     parser.add_argument('--image-path', type=str, default='images')
     parser.add_argument('--dataset', type=str, default='flickr8k')
-    parser.add_argument('--rollout-num', type=int, default=0)
+    parser.add_argument('--rollout-num', type=int, default=4)
     parser.add_argument('--max-len', type=int, default=20)
     parser.add_argument('--dis-embedding-dim', type=int, default=512)
     parser.add_argument('--dis-gru-units', type=int, default=512)
     parser.add_argument('--gen-embedding-dim', type=int, default=512)
     parser.add_argument('--gen-gru-units', type=int, default=512)
     parser.add_argument('--attention-dim', type=int, default=512)
-    parser.add_argument('--gen-checkpoint-filename', type=str, default='mle_gen_resnet152_9.pth')
-    parser.add_argument('--dis-checkpoint-filename', type=str, default='pretrain_dis_9_multinomial_resnet152.pth')
+    parser.add_argument('--gen-checkpoint-filename', type=str, default='mle_gen_resnet152_5.pth')
+    parser.add_argument('--dis-checkpoint-filename', type=str, default='pretrain_dis_5_multinomial_resnet152.pth')
     parser.add_argument('--use-image-features', type=bool, default=True)
     parser.add_argument('--sampling-method', type=str, default='multinomial')
 
