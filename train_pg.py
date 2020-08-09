@@ -101,7 +101,7 @@ def main(args):
         checkpoint = torch.load(gen_checkpoint_path)
         generator.load_state_dict(checkpoint['gen_state_dict'])
         generator.to(device)
-        if args.gen_checkpoint_filename.split('_')[0] == 'pg':
+        if args.gen_checkpoint_filename.split('_')[0] == 'PG':
             gen_optimizer.load_state_dict(checkpoint['gen_optimizer_state_dict'])
             gen_batch_id = checkpoint['gen_batch_id']
             gen_epoch = checkpoint['gen_epoch']
@@ -110,7 +110,7 @@ def main(args):
         logging.info('loaded discriminator checkpoint')
         checkpoint = torch.load(dis_checkpoint_path)
         discriminator.load_state_dict(checkpoint['dis_state_dict'])
-        if args.dis_checkpoint_filename.split('_')[0] == 'pg':
+        if args.dis_checkpoint_filename.split('_')[0] == 'PG':
             dis_optimizer.load_state_dict(checkpoint['dis_optimizer_state_dict'])
             dis_batch_id = checkpoint['dis_batch_id']
             dis_epoch = checkpoint['dis_epoch']
