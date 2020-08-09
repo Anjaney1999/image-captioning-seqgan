@@ -9,20 +9,24 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Rollout(object):
 
-    def __init__(self, generator, update_rate):
-        self.rollout_generator = copy.deepcopy(generator)
-        self.rollout_generator.to(device)
-        self.train_generator = generator
-        self.update_rate = update_rate
+    def __init__(self, generator, update_rate, rollout_num):
+        if rollout_num != 0:
+            self.rollout_generator = copy.deepcopy(generator)
+            self.rollout_generator.to(device)
+            self.train_generator = generator
+            self.update_rate = update_rate
+            self.rollout_num = rollout_num
+        else:
+            self.rollout_generator = generator
 
     def get_reward(self, samples, hidden_states, discriminator, img_feats, word_index, sample_cap_lens, col_shape,
-                   args, index_word):
+                   args):
         self.rollout_generator.eval()
         with torch.no_grad():
             cap_len = torch.max(sample_cap_lens).item()
             if args.rollout_num > 0:
                 rewards = torch.zeros(samples.shape[0], col_shape).to(device)
-                for i in range(args.rollout_num):
+                for i in range(self.rollout_num):
                     for j in range(1, cap_len - 1):
                         incomplete_fake_caps = self.rollout_generator.sample(
                             cap_len=max(cap_len, args.max_len) - (j + 1),

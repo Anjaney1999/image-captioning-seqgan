@@ -77,13 +77,13 @@ def main(args):
                                 use_img_feats=True, transform=None,
                                 img_src_path=None, cnn_architecture=args.cnn_architecture,
                                 processed_data_path=args.storage + '/processed_data'),
-            batch_size=args.batch_size, shuffle=True, num_workers=1)
+            batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     else:
         encoder = Encoder(args.cnn_architecture)
         encoder.to(device)
 
         train_loader = DataLoader(
-            ImageCaptionDataset(dataset=args.dataset, split_type='train',
+            ImageCaptionDataset(dataset=args.dataset, model='generator', split_type='train',
                                 use_img_feats=False, transform=data_transforms,
                                 img_src_path=args.storage + '/images',
                                 cnn_architecture=args.cnn_architecture,
@@ -91,7 +91,7 @@ def main(args):
             batch_size=args.batch_size, shuffle=True, num_workers=0)
 
         val_loader = DataLoader(
-            ImageCaptionDataset(dataset=args.dataset, split_type='val',
+            ImageCaptionDataset(dataset=args.dataset, model='generator', split_type='val',
                                 use_img_feats=False, transform=data_transforms,
                                 img_src_path=args.storage + '/images',
                                 cnn_architecture=args.cnn_architecture,
@@ -112,9 +112,8 @@ def main(args):
                 'gen_state_dict': generator.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict()
-            }, args.storage + '/ckpts/' + args.dataset + '/gen/{}_{}_{}.pth'.format('mle_gen', args.cnn_architecture,
-                                                                                    e))
-
+            }, args.storage + '/ckpts/' + args.dataset + '/gen/{}_{}_{}.pth'.format('MLE_GEN',
+                                                                                    args.cnn_architecture, e))
         scheduler.step()
 
 
@@ -139,26 +138,19 @@ def gen_mle_train(epoch, encoder, generator, optimizer, criterion, train_loader,
             imgs = encoder(imgs)
 
         optimizer.zero_grad()
-
         preds, caps, output_lens, alphas, indices = generator(imgs, caps, cap_lens)
-
         loss = 0.0
         for i in range(caps.shape[0]):
             loss += criterion(preds[i, :], caps[i, 1:])
-
         loss = loss / (1.0 * caps.shape[0])
+        loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
         preds = pack_padded_sequence(preds, output_lens, batch_first=True)[0]
         targets = pack_padded_sequence(caps[:, 1:], output_lens, batch_first=True)[0]
-        # loss = criterion(preds, targets)
-        loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
-
         loss.backward()
-
+        torch.nn.utils.clip_grad_norm_(generator.parameters(), args.clip)
         optimizer.step()
-
         top1_acc = categorical_accuracy(preds, targets, 1)
         top1.update(top1_acc, sum(output_lens))
-
         top5_acc = categorical_accuracy(preds, targets, 5)
         top5.update(top5_acc, sum(output_lens))
 
@@ -175,18 +167,12 @@ def gen_mle_train(epoch, encoder, generator, optimizer, criterion, train_loader,
                                                                     top1.avg, top1.val))
 
             if args.save_stats:
-                with open(args.storage + '/stats/' + args.dataset + '/gen/train_mle_gen.csv', 'a+') as file:
+                with open(args.storage + '/stats/' + args.dataset + '/gen/TRAIN_MLE_GEN.csv', 'a+') as file:
                     writer = csv.writer(file)
                     writer.writerow([epoch, batch_id, losses.avg, losses.val, top5.avg, top5.val, top1.avg, top1.val])
 
 
-def validate(epoch,
-             encoder,
-             generator,
-             criterion,
-             val_loader,
-             word_index,
-             args):
+def validate(epoch, encoder, generator, criterion, val_loader, word_index, args):
     losses = AverageMeter()
     top5 = AverageMeter()
     top1 = AverageMeter()
@@ -211,12 +197,14 @@ def validate(epoch,
             if not args.use_image_features:
                 imgs = encoder(imgs)
             preds, caps, output_lens, alphas, indices = generator(imgs, caps, cap_lens)
+            loss = 0.0
+            for i in range(caps.shape[0]):
+                loss += criterion(preds[i, :], caps[i, 1:])
+            loss = loss / (1.0 * caps.shape[0])
+            loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
             preds_clone = preds.clone()
             preds = pack_padded_sequence(preds, output_lens, batch_first=True)[0]
             targets = pack_padded_sequence(caps[:, 1:], output_lens, batch_first=True)[0]
-            loss = criterion(preds, targets)
-            loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
-
             top1_acc = categorical_accuracy(preds, targets, 1)
             top1.update(top1_acc, sum(output_lens))
             top5_acc = categorical_accuracy(preds, targets, 5)
@@ -271,11 +259,10 @@ def validate(epoch,
                                                    bleu_3, bleu_4, bleu_1_tf, bleu_2_tf, bleu_3_tf, bleu_4_tf))
 
         if args.save_stats:
-            with open(args.storage + '/stats/' + args.dataset + '/gen/val_mle_gen.csv', 'a+') as file:
+            with open(args.storage + '/stats/' + args.dataset + '/gen/VAL_MLE_GEN.csv', 'a+') as file:
                 writer = csv.writer(file)
-                writer.writerow(
-                    [epoch, batch_id, losses.avg, losses.val, top5.avg, top5.val, top1.avg, top1.val, bleu_1, bleu_2,
-                     bleu_3, bleu_4, bleu_1_tf, bleu_2_tf, bleu_3_tf, bleu_4_tf])
+                writer.writerow([epoch, losses.avg, losses.val, top5.avg, top5.val, top1.avg, top1.val,
+                                 bleu_1, bleu_2, bleu_3, bleu_4, bleu_1_tf, bleu_2_tf, bleu_3_tf, bleu_4_tf])
 
 
 if __name__ == "__main__":
@@ -283,6 +270,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--lr', type=float, default=1e-3)
+    parser.add_argument('--clip', type=float, default=5.0)
     parser.add_argument('--alpha-c', type=float, default=1.)
     parser.add_argument('--step-size', type=float, default=5)
     parser.add_argument('--print-freq', type=int, default=50)

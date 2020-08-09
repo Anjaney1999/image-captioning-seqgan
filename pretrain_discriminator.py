@@ -161,8 +161,7 @@ def train(epoch, encoder, generator, discriminator, dis_optimizer, dis_criterion
 
             if args.save_stats:
                 with open(args.storage + '/stats/' + args.dataset +
-                          '/dis/{}_{}_{}.csv'.format('pretrain_dis', args.sampling_method, args.cnn_architecture),
-                          'a+') as file:
+                          '/dis/{}_{}.csv'.format('PRETRAIN_DIS', args.cnn_architecture), 'a+') as file:
                     writer = csv.writer(file)
                     writer.writerow(
                         [epoch, batch_id, losses.avg, losses.val, acc.val, acc.avg])
