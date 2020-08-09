@@ -10,7 +10,7 @@ The code is functional (if I do find bugs, I will try to fix it immediately). Fo
 
 To run the program:
 * Place the data splits (http://cs.stanford.edu/people/karpathy/deepimagesent/caption_datasets.zip) provided by Andrej Karpathy in the karpathy_splits folder
-* Place images from flickr8k, flickr30, or coco within the images folder (make sure to place it in the correct subdirectory)
+* Place images from flickr8k, flickr30, or coco within the images folder (make sure to place it in the correct subdirectory). For coco, place the train2014 and val2014 folders as in into the correct image folder
 * Run preprocess.py
 * Run train_mle.py
 * Run pretrain_discriminator.py
