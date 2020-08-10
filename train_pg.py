@@ -291,8 +291,7 @@ def gen_train(imgs, caps, cap_lens, encoder, generator, discriminator, rollout, 
         pg_loss += torch.sum(gen_pg_criterion(pg_preds[i, :pg_output_lens[i]],
                                               pg_caps[i, 1:pg_output_lens[i] + 1]) * rewards[i, :pg_output_lens[i]])
     pg_loss = pg_loss / (1.0 * caps.shape[0])
-    loss = args.lambda1 * pg_loss
-    loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
+    loss = args.lambda1 * (pg_loss + args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean())
 
     if args.lambda2 != 0.0:
         mle_loss = 0.0
@@ -330,18 +329,19 @@ def validate(epoch, gen_epoch, gen_batch_id, encoder, generator, criterion, val_
             if not args.use_image_features:
                 imgs = encoder(imgs)
             preds, caps, output_lens, alphas, indices = generator(imgs, caps, cap_lens)
+            loss = 0.0
+            for i in range(caps.shape[0]):
+                loss += criterion(preds[i, :], caps[i, 1:])
+            loss = loss / (1.0 * caps.shape[0])
+            loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
             preds_clone = preds.clone()
             preds = pack_padded_sequence(preds, output_lens, batch_first=True)[0]
             targets = pack_padded_sequence(caps[:, 1:], output_lens, batch_first=True)[0]
-            loss = criterion(preds, targets)
-            loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
-
             top1_acc = categorical_accuracy(preds, targets, 1)
             top1.update(top1_acc, sum(output_lens))
             top5_acc = categorical_accuracy(preds, targets, 5)
             top5.update(top5_acc, sum(output_lens))
             losses.update(loss.item(), sum(output_lens))
-
             matching_caps = matching_caps[indices]
             for cap_set in matching_caps.tolist():
                 refs = []
@@ -350,7 +350,6 @@ def validate(epoch, gen_epoch, gen_batch_id, encoder, generator, criterion, val_
                            if word_id != word_index['<start>'] and word_id != word_index['<pad>']]
                     refs.append(cap)
                 references.append(refs)
-
             fake_caps, _ = generator.sample(cap_len=max(torch.max(cap_lens).item(), args.max_len),
                                             col_shape=caps.shape[1],
                                             img_feats=imgs[indices],
@@ -358,7 +357,6 @@ def validate(epoch, gen_epoch, gen_batch_id, encoder, generator, criterion, val_
             word_idxs, _ = pad_generated_captions(fake_caps.cpu().numpy(), word_index)
             for idxs in word_idxs.tolist():
                 hypotheses.append([idx for idx in idxs if idx != word_index['<start>'] and idx != word_index['<pad>']])
-
             word_idxs = torch.max(preds_clone, dim=2)[1]
             word_idxs, _ = pad_generated_captions(word_idxs.cpu().numpy(), word_index)
             for idxs in word_idxs.tolist():
