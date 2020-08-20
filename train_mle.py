@@ -270,7 +270,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--lr', type=float, default=1e-3)
-    parser.add_argument('--clip', type=float, default=5.0)
+    parser.add_argument('--clip', type=float, default=10.0)
     parser.add_argument('--alpha-c', type=float, default=1.)
     parser.add_argument('--step-size', type=float, default=5)
     parser.add_argument('--print-freq', type=int, default=50)
@@ -284,7 +284,7 @@ if __name__ == "__main__":
     parser.add_argument('--attention-dim', type=int, default=512)
     parser.add_argument('--gru-units', type=int, default=512)
     parser.add_argument('--max-len', type=int, default=20)
-    parser.add_argument('--save-model', type=bool, default=True)
+    parser.add_argument('--save-model', type=bool, default=False)
     parser.add_argument('--save-stats', type=bool, default=False)
     parser.add_argument('--workers', type=int, default=2)
 

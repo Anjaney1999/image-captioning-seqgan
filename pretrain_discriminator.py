@@ -49,6 +49,7 @@ def main(args):
     discriminator.to(device)
 
     dis_optimizer = optim.Adam(discriminator.parameters(), lr=args.lr)
+    scheduler = torch.optim.lr_scheduler.StepLR(dis_optimizer, step_size=args.step_size, gamma=0.5)
     dis_criterion = nn.BCELoss().to(device)
 
     gen_checkpoint_path = args.storage + '/ckpts/' + args.dataset + '/gen/' + args.gen_checkpoint_filename
@@ -71,7 +72,7 @@ def main(args):
                                 use_img_feats=True, transform=None,
                                 img_src_path=None, cnn_architecture=args.cnn_architecture,
                                 processed_data_path=args.storage + '/processed_data'),
-            batch_size=args.batch_size, shuffle=True, num_workers=1)
+            batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
     else:
         encoder = Encoder(args.cnn_architecture)
         encoder.to(device)
@@ -82,7 +83,7 @@ def main(args):
                                 img_src_path=args.storage + '/images',
                                 cnn_architecture=args.cnn_architecture,
                                 processed_data_path=args.storage + '/processed_data'),
-            batch_size=args.batch_size, shuffle=True, num_workers=0)
+            batch_size=args.batch_size, shuffle=True, num_workers=args.workers)
 
     for e in range(args.epochs):
         train(epoch=e, generator=generator, encoder=encoder,
@@ -94,10 +95,12 @@ def main(args):
             torch.save(
                 {'dis_state_dict': discriminator.state_dict(), 'optimizer_state_dict': dis_optimizer.state_dict()},
                 args.storage + '/ckpts/' + args.dataset +
-                '/dis/{}_{}_{}_{}.pth'.format('pretrain_dis', e,
+                '/dis/{}_{}_{}_{}.pth'.format('PRETRAIN_DIS', e,
                                                  args.sampling_method,
                                                  args.cnn_architecture))
         logging.info('Completed epoch: ' + str(e))
+
+        scheduler.step()
 
 
 def sample_from_start(imgs, caps, cap_lens, generator, word_index, args):
@@ -170,8 +173,9 @@ def train(epoch, encoder, generator, discriminator, dis_optimizer, dis_criterion
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Pre-train discriminator')
     parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=20)
-    parser.add_argument('--lr', type=float, default=1e-3)
+    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--lr', type=float, default=5e-4)
+    parser.add_argument('--step-size', type=float, default=5)
     parser.add_argument('--print-freq', type=int, default=50)
     parser.add_argument('--sampling-method', type=str, default='multinomial')
     parser.add_argument('--cnn-architecture', type=str, default='resnet152')
@@ -184,9 +188,10 @@ if __name__ == "__main__":
     parser.add_argument('--gen-embedding-dim', type=int, default=512)
     parser.add_argument('--gen-gru-units', type=int, default=512)
     parser.add_argument('--attention-dim', type=int, default=512)
-    parser.add_argument('--gen-checkpoint-filename', type=str, default='mle_gen_resnet152_5.pth')
+    parser.add_argument('--gen-checkpoint-filename', type=str, default='')
     parser.add_argument('--dis-checkpoint-filename', type=str, default='')
     parser.add_argument('--use-image-features', type=bool, default=True)
     parser.add_argument('--save-model', type=bool, default=True)
     parser.add_argument('--save-stats', type=bool, default=False)
+    parser.add_argument('--workers', type=int, default=2)
     main(parser.parse_args())

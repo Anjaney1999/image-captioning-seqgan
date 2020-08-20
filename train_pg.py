@@ -45,7 +45,7 @@ def main(args):
     gen_pg_criterion = nn.CrossEntropyLoss(reduction='none', ignore_index=word_index['<pad>']).to(device)
     gen_mle_criterion = nn.CrossEntropyLoss(reduction='sum', ignore_index=word_index['<pad>']).to(device)
 
-    rollout = Rollout(generator, 0.8, args.rollout_num)
+    rollout = Rollout(generator, 0.0, args.rollout_num)
 
     if args.use_image_features:
         gen_train_loader = DataLoader(
@@ -408,11 +408,11 @@ if __name__ == "__main__":
     parser.add_argument('--d-steps', type=int, default=1)
     parser.add_argument('--gen-lr', type=float, default=1e-4)
     parser.add_argument('--dis-lr', type=float, default=1e-4)
-    parser.add_argument('--clip', type=float, default=5.0)
+    parser.add_argument('--clip', type=float, default=10.0)
     parser.add_argument('--alpha-c', type=float, default=1.0)
     parser.add_argument('--lambda1', type=float, default=1.0)
     parser.add_argument('--lambda2', type=float, default=0.0)
-    parser.add_argument('--val-freq', type=int, default=200)
+    parser.add_argument('--val-freq', type=int, default=100)
     parser.add_argument('--gen-print-freq', type=int, default=50)
     parser.add_argument('--dis-print-freq', type=int, default=50)
     parser.add_argument('--save-stats', type=bool, default=False)
@@ -428,8 +428,8 @@ if __name__ == "__main__":
     parser.add_argument('--gen-embedding-dim', type=int, default=512)
     parser.add_argument('--gen-gru-units', type=int, default=512)
     parser.add_argument('--attention-dim', type=int, default=512)
-    parser.add_argument('--gen-checkpoint-filename', type=str, default='')
-    parser.add_argument('--dis-checkpoint-filename', type=str, default='')
+    parser.add_argument('--gen-checkpoint-filename', type=str, default='mle_gen_resnet152_5.pth')
+    parser.add_argument('--dis-checkpoint-filename', type=str, default='pretrain_dis_5_multinomial_resnet152.pth')
     parser.add_argument('--use-image-features', type=bool, default=True)
     parser.add_argument('--sampling-method', type=str, default='multinomial')
     parser.add_argument('--workers', type=int, default=2)
