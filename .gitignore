@@ -54,6 +54,7 @@ code.zip
 *.ipynb
 nlg-eval/
 pycocoevalcap/
+eval.py
 
 
 

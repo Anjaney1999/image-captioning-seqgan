@@ -138,7 +138,7 @@ def main(args):
                           args=args, encoder=encoder,
                           pg_losses=gen_pg_losses, mle_losses=gen_mle_losses)
                 time_taken = time.time() - start_time
-                if epoch % args.print_freq == 0:
+                if gen_batch_id % args.gen_print_freq == 0:
                     logging.info('GENERATOR: ADV EPOCH: [{}]\t'
                                  'GEN Epoch: [{}]\t'
                                  'Batch: [{}]\t'
@@ -179,7 +179,7 @@ def main(args):
                           dis_criterion=dis_criterion, word_index=word_index,
                           args=args, losses=dis_losses, acc=dis_acc)
                 time_taken = time.time() - start_time
-                if epoch % args.print_freq == 0:
+                if dis_batch_id % args.dis_print_freq == 0:
                     logging.info('DISCRIMINATOR: ADV Epoch: [{}]\t'
                                  'DIS Epoch: [{}]\t'
                                  'Batch: [{}]\t'
@@ -217,26 +217,26 @@ def main(args):
                     {'gen_state_dict': generator.state_dict(), 'optimizer_state_dict': gen_optimizer.state_dict(),
                      'gen_batch_id': gen_batch_id, 'gen_epoch': gen_epoch}, args.storage + '/ckpts/' + args.dataset +
                                                                             '/gen/{}_'.format('TRAIN_PG_GEN') +
-                                                                            'EPOCH_{}_'.format(epoch) +
-                                                                            'GEN_EPOCH_{}_'.format(gen_epoch) +
-                                                                            'GEN_BATCH_{}_'.format(gen_batch_id) +
-                                                                            'LR_{}_'.format(args.gen_lr) +
                                                                             'ROLLOUT_{}_'.format(args.rollout_num) +
                                                                             'G-STEPS_{}_'.format(args.g_steps) +
                                                                             'D-STEPS_{}_'.format(args.d_steps) +
-                                                                            'CNN-ARCH_{}.pth'.format(args.cnn_architecture))
+                                                                            'CNN-ARCH_{}.pth'.format(args.cnn_architecture) +
+                                                                            'EPOCH_{}_'.format(epoch) +
+                                                                            'GEN_EPOCH_{}_'.format(gen_epoch) +
+                                                                            'GEN_BATCH_{}_'.format(gen_batch_id) +
+                                                                            'LR_{}_'.format(args.gen_lr))
                 torch.save(
                     {'dis_state_dict': discriminator.state_dict(), 'optimizer_state_dict': dis_optimizer.state_dict(),
                      'dis_batch_id': dis_batch_id, 'dis_epoch': dis_epoch}, args.storage + '/ckpts/' + args.dataset +
                                                                             '/dis/{}_'.format('TRAIN_PG_DIS') +
-                                                                            'EPOCH_{}_'.format(epoch) +
-                                                                            'DIS_EPOCH_{}_'.format(dis_epoch) +
-                                                                            'DIS_BATCH_{}_'.format(dis_batch_id) +
-                                                                            'LR_{}_'.format(args.dis_lr) +
                                                                             'ROLLOUT_{}_'.format(args.rollout_num) +
                                                                             'G-STEPS_{}_'.format(args.g_steps) +
                                                                             'D-STEPS_{}_'.format(args.d_steps) +
-                                                                            'CNN-ARCH_{}.pth'.format(args.cnn_architecture))
+                                                                            'CNN-ARCH_{}.pth'.format(args.cnn_architecture) +
+                                                                            'EPOCH_{}_'.format(epoch) +
+                                                                            'DIS_EPOCH_{}_'.format(dis_epoch) +
+                                                                            'DIS_BATCH_{}_'.format(dis_batch_id) +
+                                                                            'LR_{}_'.format(args.dis_lr))
             completed_epoch = False
 
         if args.rollout_num != 0:
@@ -429,7 +429,8 @@ if __name__ == "__main__":
     parser.add_argument('--lambda1', type=float, default=1.0)
     parser.add_argument('--lambda2', type=float, default=0.0)
     parser.add_argument('--val-freq', type=int, default=100)
-    parser.add_argument('--print-freq', type=int, default=50)
+    parser.add_argument('--gen-print-freq', type=int, default=50)
+    parser.add_argument('--dis-print-freq', type=int, default=50)
     parser.add_argument('--save-stats', type=bool, default=True)
     parser.add_argument('--save-models', type=bool, default=True)
     parser.add_argument('--cnn-architecture', type=str, default='resnet152')
