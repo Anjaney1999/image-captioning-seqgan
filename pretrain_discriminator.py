@@ -57,11 +57,13 @@ def main(args):
 
     if path.isfile(gen_checkpoint_path):
         checkpoint = torch.load(gen_checkpoint_path)
+        logging.info('loaded generator')
         generator.load_state_dict(checkpoint['gen_state_dict'])
         generator.to(device)
 
     if path.isfile(dis_checkpoint_path):
         checkpoint = torch.load(dis_checkpoint_path)
+        logging.info('loaded discriminator')
         discriminator.load_state_dict(checkpoint['dis_state_dict'])
         dis_optimizer.load_state_dict(checkpoint['dis_optimizer_state_dict'])
         discriminator.to(device)
@@ -188,7 +190,7 @@ if __name__ == "__main__":
     parser.add_argument('--gen-embedding-dim', type=int, default=512)
     parser.add_argument('--gen-gru-units', type=int, default=512)
     parser.add_argument('--attention-dim', type=int, default=512)
-    parser.add_argument('--gen-checkpoint-filename', type=str, default='')
+    parser.add_argument('--gen-checkpoint-filename', type=str, default='mle_gen_resnet152_5.pth')
     parser.add_argument('--dis-checkpoint-filename', type=str, default='')
     parser.add_argument('--use-image-features', type=bool, default=True)
     parser.add_argument('--save-model', type=bool, default=True)
