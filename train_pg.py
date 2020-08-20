@@ -138,7 +138,7 @@ def main(args):
                           args=args, encoder=encoder,
                           pg_losses=gen_pg_losses, mle_losses=gen_mle_losses)
                 time_taken = time.time() - start_time
-                if gen_batch_id % args.gen_print_freq == 0:
+                if epoch % args.print_freq == 0:
                     logging.info('GENERATOR: ADV EPOCH: [{}]\t'
                                  'GEN Epoch: [{}]\t'
                                  'Batch: [{}]\t'
@@ -149,10 +149,12 @@ def main(args):
                                                                       gen_mle_losses.avg, gen_mle_losses.val))
                     if args.save_stats:
                         with open(args.storage + '/stats/' + args.dataset +
-                                  '/gen/{}_LR:{}_ROLLOUT:{}_G-STEPS:{}_' +
-                                  'D-STEPS:{}_CNN-ARCH:{}.csv'.format('TRAIN_PG_GEN', str(args.gen_lr),
-                                                                      args.rollout_num, args.g_steps, args.d_steps,
-                                                                      args.cnn_architecture), 'a+') as file:
+                                  '/gen/{}_'.format('TRAIN_PG_GEN') +
+                                  'LR_{}_'.format(str(args.gen_lr)) +
+                                  'ROLLOUT_{}_'.format(args.rollout_num) +
+                                  'G-STEPS_{}_'.format(args.g_steps) +
+                                  'D-STEPS_{}_'.format(args.d_steps) +
+                                  'CNN-ARCH_{}.csv'.format(args.cnn_architecture), "a+") as file:
                             writer = csv.writer(file)
                             writer.writerow([epoch, gen_epoch, gen_batch_id, gen_pg_losses.avg, gen_pg_losses.val,
                                              gen_mle_losses.avg, gen_mle_losses.val])
@@ -177,7 +179,7 @@ def main(args):
                           dis_criterion=dis_criterion, word_index=word_index,
                           args=args, losses=dis_losses, acc=dis_acc)
                 time_taken = time.time() - start_time
-                if dis_batch_id % args.dis_print_freq == 0:
+                if epoch % args.print_freq == 0:
                     logging.info('DISCRIMINATOR: ADV Epoch: [{}]\t'
                                  'DIS Epoch: [{}]\t'
                                  'Batch: [{}]\t'
@@ -188,10 +190,12 @@ def main(args):
                                                                     dis_acc.val, dis_acc.avg))
                     if args.save_stats:
                         with open(args.storage + '/stats/' + args.dataset +
-                                  '/dis/{}_LR:{}_ROLLOUT:{}_G-STEPS:{}_' +
-                                  'D-STEPS:{}_CNN-ARCH:{}.csv'.format('TRAIN_PG_DIS', str(args.dis_lr),
-                                                                      args.rollout_num, args.g_steps, args.d_steps,
-                                                                      args.cnn_architecture), 'a+') as file:
+                                  '/dis/{}_'.format('TRAIN_PG_DIS') +
+                                  'LR_{}_'.format(args.dis_lr) +
+                                  'ROLLOUT_{}_'.format(args.rollout_num) +
+                                  'G-STEPS_{}_'.format(args.g_steps) +
+                                  'D-STEPS_{}_'.format(args.d_steps) +
+                                  'CNN-ARCH_{}.csv'.format(args.cnn_architecture), 'a+') as file:
                             writer = csv.writer(file)
                             writer.writerow([epoch, gen_epoch, gen_batch_id, dis_epoch, dis_batch_id, dis_losses.avg,
                                              dis_losses.val, dis_acc.val, dis_acc.avg])
@@ -211,18 +215,28 @@ def main(args):
             if args.save_models:
                 torch.save(
                     {'gen_state_dict': generator.state_dict(), 'optimizer_state_dict': gen_optimizer.state_dict(),
-                     'gen_batch_id': gen_batch_id, 'gen_epoch': gen_epoch},
-                    args.storage + '/ckpts/' + args.dataset + '/gen/{}_LR:{}_ADV-EPOCH:{}_GEN-EPOCH:{}_' +
-                    'GEN-BATCH:{}_ROLLOUT:{}_G-STEP:{}_D-STEPS:{}_CNN-ARCH:{}.pth'.format(
-                        'PG_GEN', str(args.gen_lr), epoch, gen_epoch, gen_batch_id,
-                        args.rollout_num, args.g_steps, args.d_steps, args.cnn_architecture))
+                     'gen_batch_id': gen_batch_id, 'gen_epoch': gen_epoch}, args.storage + '/ckpts/' + args.dataset +
+                                                                            '/gen/{}_'.format('TRAIN_PG_GEN') +
+                                                                            'EPOCH_{}_'.format(epoch) +
+                                                                            'GEN_EPOCH_{}_'.format(gen_epoch) +
+                                                                            'GEN_BATCH_{}_'.format(gen_batch_id) +
+                                                                            'LR_{}_'.format(args.gen_lr) +
+                                                                            'ROLLOUT_{}_'.format(args.rollout_num) +
+                                                                            'G-STEPS_{}_'.format(args.g_steps) +
+                                                                            'D-STEPS_{}_'.format(args.d_steps) +
+                                                                            'CNN-ARCH_{}.pth'.format(args.cnn_architecture))
                 torch.save(
                     {'dis_state_dict': discriminator.state_dict(), 'optimizer_state_dict': dis_optimizer.state_dict(),
-                     'dis_batch_id': dis_batch_id, 'dis_epoch': dis_epoch},
-                    args.storage + '/ckpts/' + args.dataset + '/dis/{}_LR:{}_ADV-EPOCH:{}_DIS-EPOCH:{}_' +
-                    'DIS-BATCH:{}_ROLLOUT:{}_G-STEP:{}_D-STEPS:{}_CNN-ARCH:{}.pth'.format(
-                        'PG_DIS', str(args.dis_lr), epoch, dis_epoch, dis_batch_id,
-                        args.rollout_num, args.g_steps, args.d_steps, args.cnn_architecture))
+                     'dis_batch_id': dis_batch_id, 'dis_epoch': dis_epoch}, args.storage + '/ckpts/' + args.dataset +
+                                                                            '/dis/{}_'.format('TRAIN_PG_DIS') +
+                                                                            'EPOCH_{}_'.format(epoch) +
+                                                                            'DIS_EPOCH_{}_'.format(dis_epoch) +
+                                                                            'DIS_BATCH_{}_'.format(dis_batch_id) +
+                                                                            'LR_{}_'.format(args.dis_lr) +
+                                                                            'ROLLOUT_{}_'.format(args.rollout_num) +
+                                                                            'G-STEPS_{}_'.format(args.g_steps) +
+                                                                            'D-STEPS_{}_'.format(args.d_steps) +
+                                                                            'CNN-ARCH_{}.pth'.format(args.cnn_architecture))
             completed_epoch = False
 
         if args.rollout_num != 0:
@@ -390,10 +404,12 @@ def validate(epoch, gen_epoch, gen_batch_id, encoder, generator, criterion, val_
                                                    bleu_3_tf, bleu_4_tf))
         if args.save_stats:
             with open(args.storage + '/stats/' + args.dataset +
-                      '/gen/{}_LR:{}_ROLLOUT:{}_G-STEPS:{}_' +
-                      'D-STEPS:{}_CNN-ARCH:{}.csv'.format('VAL_PG_GEN', str(args.gen_lr), args.rollout_num,
-                                                          args.g_steps, args.d_steps,
-                                                          args.cnn_architecture), 'a+') as file:
+                      '/gen/{}_'.format('VAL_PG_GEN') +
+                      'LR_{}_'.format(args.gen_lr) +
+                      'ROLLOUT_{}_'.format(args.rollout_num) +
+                      'G-STEPS_{}_'.format(args.g_steps) +
+                      'D-STEPS_{}_'.format(args.d_steps) +
+                      'CNN-ARCH_{}.csv'.format(args.cnn_architecture), 'a+') as file:
                 writer = csv.writer(file)
                 writer.writerow([epoch, gen_epoch, gen_batch_id, top5.avg, top5.val, top1.avg, top1.val, bleu_1,
                                  bleu_2, bleu_3, bleu_4, bleu_1_tf, bleu_2_tf, bleu_3_tf, bleu_4_tf])
@@ -413,10 +429,9 @@ if __name__ == "__main__":
     parser.add_argument('--lambda1', type=float, default=1.0)
     parser.add_argument('--lambda2', type=float, default=0.0)
     parser.add_argument('--val-freq', type=int, default=100)
-    parser.add_argument('--gen-print-freq', type=int, default=50)
-    parser.add_argument('--dis-print-freq', type=int, default=50)
-    parser.add_argument('--save-stats', type=bool, default=False)
-    parser.add_argument('--save-models', type=bool, default=False)
+    parser.add_argument('--print-freq', type=int, default=50)
+    parser.add_argument('--save-stats', type=bool, default=True)
+    parser.add_argument('--save-models', type=bool, default=True)
     parser.add_argument('--cnn-architecture', type=str, default='resnet152')
     parser.add_argument('--storage', type=str, default='.')
     parser.add_argument('--image-path', type=str, default='images')
