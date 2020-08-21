@@ -147,7 +147,7 @@ def gen_mle_train(epoch, encoder, generator, optimizer, criterion, train_loader,
         preds = pack_padded_sequence(preds, output_lens, batch_first=True)[0]
         targets = pack_padded_sequence(caps[:, 1:], output_lens, batch_first=True)[0]
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(generator.parameters(), args.clip)
+        # torch.nn.utils.clip_grad_norm_(generator.parameters(), args.clip)
         optimizer.step()
         top1_acc = categorical_accuracy(preds, targets, 1)
         top1.update(top1_acc, sum(output_lens))
