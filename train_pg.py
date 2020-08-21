@@ -221,10 +221,10 @@ def main(args):
                                                                             'G-STEPS_{}_'.format(args.g_steps) +
                                                                             'D-STEPS_{}_'.format(args.d_steps) +
                                                                             'CNN-ARCH_{}.pth'.format(args.cnn_architecture) +
-                                                                            'EPOCH_{}_'.format(epoch) +
-                                                                            'GEN_EPOCH_{}_'.format(gen_epoch) +
-                                                                            'GEN_BATCH_{}_'.format(gen_batch_id) +
-                                                                            'LR_{}_'.format(args.gen_lr))
+                                                                            'LR_{}_'.format(args.gen_lr) +
+                                                                            '{}_'.format(epoch) +
+                                                                            '{}_'.format(gen_epoch) +
+                                                                            '{}.pth'.format(gen_batch_id))
                 torch.save(
                     {'dis_state_dict': discriminator.state_dict(), 'optimizer_state_dict': dis_optimizer.state_dict(),
                      'dis_batch_id': dis_batch_id, 'dis_epoch': dis_epoch}, args.storage + '/ckpts/' + args.dataset +
@@ -232,11 +232,11 @@ def main(args):
                                                                             'ROLLOUT_{}_'.format(args.rollout_num) +
                                                                             'G-STEPS_{}_'.format(args.g_steps) +
                                                                             'D-STEPS_{}_'.format(args.d_steps) +
-                                                                            'CNN-ARCH_{}.pth'.format(args.cnn_architecture) +
-                                                                            'EPOCH_{}_'.format(epoch) +
-                                                                            'DIS_EPOCH_{}_'.format(dis_epoch) +
-                                                                            'DIS_BATCH_{}_'.format(dis_batch_id) +
-                                                                            'LR_{}_'.format(args.dis_lr))
+                                                                            'CNN-ARCH_{}_'.format(args.cnn_architecture) +
+                                                                            'LR_{}_'.format(args.dis_lr) +
+                                                                            '{}_'.format(epoch) +
+                                                                            '{}_'.format(dis_epoch) +
+                                                                            '{}.pth'.format(dis_batch_id))
             completed_epoch = False
 
         if args.rollout_num != 0:
