@@ -220,8 +220,7 @@ def main(args):
                                                                             'ROLLOUT_{}_'.format(args.rollout_num) +
                                                                             'G-STEPS_{}_'.format(args.g_steps) +
                                                                             'D-STEPS_{}_'.format(args.d_steps) +
-                                                                            'CNN-ARCH_{}.pth'.format(args.cnn_architecture) +
-                                                                            'LR_{}_'.format(args.gen_lr) +
+                                                                            'CNN-ARCH_{}_'.format(args.cnn_architecture) +
                                                                             '{}_'.format(epoch) +
                                                                             '{}_'.format(gen_epoch) +
                                                                             '{}.pth'.format(gen_batch_id))
@@ -233,7 +232,6 @@ def main(args):
                                                                             'G-STEPS_{}_'.format(args.g_steps) +
                                                                             'D-STEPS_{}_'.format(args.d_steps) +
                                                                             'CNN-ARCH_{}_'.format(args.cnn_architecture) +
-                                                                            'LR_{}_'.format(args.dis_lr) +
                                                                             '{}_'.format(epoch) +
                                                                             '{}_'.format(dis_epoch) +
                                                                             '{}.pth'.format(dis_batch_id))
