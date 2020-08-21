@@ -57,15 +57,15 @@ def main(args):
 
     if path.isfile(gen_checkpoint_path):
         checkpoint = torch.load(gen_checkpoint_path)
-        logging.info('loaded generator')
         generator.load_state_dict(checkpoint['gen_state_dict'])
+        logging.info('loaded generator')
         generator.to(device)
 
     if path.isfile(dis_checkpoint_path):
         checkpoint = torch.load(dis_checkpoint_path)
-        logging.info('loaded discriminator')
         discriminator.load_state_dict(checkpoint['dis_state_dict'])
         dis_optimizer.load_state_dict(checkpoint['dis_optimizer_state_dict'])
+        logging.info('loaded discriminator')
         discriminator.to(device)
 
     if args.use_image_features:
