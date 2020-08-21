@@ -144,16 +144,15 @@ def gen_mle_train(epoch, encoder, generator, optimizer, criterion, train_loader,
             loss += criterion(preds[i, :], caps[i, 1:])
         loss = loss / (1.0 * caps.shape[0])
         loss += args.alpha_c * ((1. - alphas.sum(dim=1)) ** 2).mean()
+        preds = pack_padded_sequence(preds, output_lens, batch_first=True)[0]
+        targets = pack_padded_sequence(caps[:, 1:], output_lens, batch_first=True)[0]
         loss.backward()
         torch.nn.utils.clip_grad_norm_(generator.parameters(), args.clip)
         optimizer.step()
-        preds = pack_padded_sequence(preds, output_lens, batch_first=True)[0]
-        targets = pack_padded_sequence(caps[:, 1:], output_lens, batch_first=True)[0]
         top1_acc = categorical_accuracy(preds, targets, 1)
         top1.update(top1_acc, sum(output_lens))
         top5_acc = categorical_accuracy(preds, targets, 5)
         top5.update(top5_acc, sum(output_lens))
-
         losses.update(loss.item(), sum(output_lens))
 
         if batch_id % args.print_freq == 0:
@@ -269,7 +268,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Maximum Likelihood Estimation Training')
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=20)
-    parser.add_argument('--lr', type=float, default=1e-3)
+    parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--clip', type=float, default=10.0)
     parser.add_argument('--alpha-c', type=float, default=1.)
     parser.add_argument('--step-size', type=float, default=5)
