@@ -152,9 +152,11 @@ def train(epoch, encoder, generator, discriminator, dis_optimizer, dis_criterion
         loss.backward()
         dis_optimizer.step()
         losses.update(loss.item())
-        acc.update(binary_accuracy(true_preds, ones).item())
-        acc.update(binary_accuracy(false_preds, zeros).item())
-        acc.update(binary_accuracy(fake_preds, zeros).item())
+        true_acc = binary_accuracy(true_preds, ones).item()
+        false_acc = binary_accuracy(false_preds, zeros).item()
+        fake_acc = binary_accuracy(fake_preds, zeros).item()
+        avg_acc = (true_acc + false_acc + fake_acc) / 3.0
+        acc.update(avg_acc)
 
         if batch_id % args.print_freq == 0:
             logging.info('Epoch: [{}]\t'
